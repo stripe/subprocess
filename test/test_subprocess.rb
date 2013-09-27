@@ -13,7 +13,7 @@ require 'tempfile'
 # work on Windows.
 
 describe Subprocess do
-  describe 'Subprocess.popen' do
+  describe '.popen' do
     it 'creates Process objects' do
       p = Subprocess.popen(['true'])
       p.must_be_instance_of(Subprocess::Process)
@@ -21,7 +21,7 @@ describe Subprocess do
     end
   end
 
-  describe 'Subprocess.call' do
+  describe '.call' do
     it 'returns a Process::Status' do
       Subprocess.call(['true']).must_be_instance_of(Process::Status)
     end
@@ -50,7 +50,7 @@ describe Subprocess do
     end
   end
 
-  describe 'Subprocess.check_call' do
+  describe '.check_call' do
     it 'returns a Process::Status' do
       Subprocess.check_call(['true']).must_be_instance_of(Process::Status)
     end
@@ -66,7 +66,7 @@ describe Subprocess do
     end
   end
 
-  describe 'Subprocess.check_output' do
+  describe '.check_output' do
     it 'returns the stdout of the command' do
       string = 'hello world'
       Subprocess.check_output(['echo', '-n', string]).must_equal(string)
