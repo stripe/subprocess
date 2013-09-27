@@ -46,7 +46,8 @@ module Subprocess
   #   To: llama@example.com
   #   Subject: I am so fluffy.
   #
-  #   I'm going to die.
+  #   SO FLUFFY!
+  #   http://upload.wikimedia.org/wikipedia/commons/3/3e/Unshorn_alpaca_grazing.jpg
   #     EMAIL
   #   end
   #
