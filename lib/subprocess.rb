@@ -71,7 +71,7 @@ module Subprocess
   # like `Kernel#system`.
   #
   # @example Get the system load
-  #   load = Subprocess.check_output(['uptime']).split(' ').last(3)
+  #   system_load = Subprocess.check_output(['uptime']).split(' ').last(3)
   #
   # @raise [NonZeroExit] if the process returned a non-zero exit status (i.e.,
   #   was terminated with an error or was killed by a signal)

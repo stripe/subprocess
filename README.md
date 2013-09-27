@@ -53,7 +53,7 @@ end
 Parse the output of `uptime(1)` to find the system's load:
 
 ```ruby
-load = Subprocess.check_output(['uptime']).split(' ').last(3)
+system_load = Subprocess.check_output(['uptime']).split(' ').last(3)
 ```
 
 Send mail to your friends with `sendmail(1)`:
