@@ -40,8 +40,7 @@ module Subprocess
   #   Subprocess.check_call(%W{grep -q llama ~/favorite_animals})
   #
   # @example Communicate with a child process
-  #   Subprocess.check_call(%W{sendmail -t},
-  #       :stdin => Subprocess::PIPE, :stdout => Subprocess::PIPE) do |p|
+  #   Subprocess.check_call(%W{sendmail -t}, :stdin => Subprocess::PIPE) do |p|
   #     p.communicate <<-EMAIL
   #   From: alpaca@example.com
   #   To: llama@example.com

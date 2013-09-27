@@ -44,7 +44,7 @@ Check user's animal allegiances:
 ```ruby
 begin
   Subprocess.check_call(['grep', '-q', 'llamas', '~/favorite_animals'])
-rescue NonZeroExit => e
+rescue Subprocess::NonZeroExit => e
   puts e.message
   puts "Why aren't llamas one of your favorite animals?"
 end
@@ -59,8 +59,7 @@ load = Subprocess.check_output(['uptime']).split(' ').last(3)
 Send mail to your friends with `sendmail(1)`:
 
 ```ruby
-Subprocess.check_call(%W{sendmail -t},
-    :stdin => Subprocess::PIPE, :stdout => Subprocess::PIPE) do |p|
+Subprocess.check_call(%W{sendmail -t}, :stdin => Subprocess::PIPE) do |p|
   p.communicate <<-EMAIL
 From: alpaca@example.com
 To: llama@example.com
