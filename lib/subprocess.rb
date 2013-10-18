@@ -1,6 +1,8 @@
 require 'thread'
 require 'set'
 
+require 'subprocess/version'
+
 # A Ruby clone of Python's subprocess module.
 #
 # @see http://docs.python.org/2/library/subprocess.html
