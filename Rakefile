@@ -1,6 +1,10 @@
-require "rake/testtask"
+require 'bundler/gem_tasks'
+require 'bundler/setup'
+require 'rake/testtask'
 
-task :default => :test
+task :default do
+  sh 'rake -T'
+end
 
 Rake::TestTask.new do |t|
   t.libs.push "lib"
