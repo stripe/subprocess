@@ -91,14 +91,41 @@ module Subprocess
   # Print a human readable interpretation of a process exit status.
   #
   # @param [::Process::Status] status The status returned by `waitpid2`.
+  # @param [Boolean] convert_high_exit Whether to convert exit statuses greater
+  #   than 128 into the usual convention for exiting after trapping a signal.
+  #   (e.g. many programs will exit with status 130 after receiving a SIGINT /
+  #   signal 2.)
   # @return [String] Text interpretation
   #
-  def self.status_to_s(status)
+  def self.status_to_s(status, convert_high_exit=true)
 
     # use an array just in case we somehow get a status with all the bits set
     parts = []
     if status.exited?
       parts << "exited with status #{status.exitstatus}"
+      if convert_high_exit && status.exitstatus > 128
+        # convert high exit statuses into what the original signal may have
+        # been according to the usual exit status convention
+        sig_num = status.exitstatus - 128
+
+        # sigh, why is ruby so silly
+        begin
+          # ruby 2.0 way
+          sig_name = Signal.signame(sig_num)
+        rescue NoMethodError
+          begin
+            # ruby 1.9 way
+            sig_name = Signal.list.key(sig_num)
+          rescue NoMethodError
+            # ruby 1.8 way
+            sig_name = Signal.list.index(sig_num)
+          end
+        end
+
+        if sig_name
+          parts << "(maybe SIG#{sig_name})"
+        end
+      end
     end
     if status.signaled?
       parts << "killed by signal #{status.termsig}"
