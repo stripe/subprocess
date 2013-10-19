@@ -88,6 +88,32 @@ module Subprocess
     output
   end
 
+  # Print a human readable interpretation of a process exit status.
+  #
+  # @param [::Process::Status] status The status returned by `waitpid2`.
+  # @return [String] Text interpretation
+  #
+  def self.status_to_s(status)
+
+    # use an array just in case we somehow get a status with all the bits set
+    parts = []
+    if status.exited?
+      parts << "exited with status #{status.exitstatus}"
+    end
+    if status.signaled?
+      parts << "killed by signal #{status.termsig}"
+    end
+    if status.stopped?
+      parts << "stopped by signal #{status.stopsig}"
+    end
+
+    if parts.empty?
+      raise ArgumentError.new("Don't know how to interpret #{status.inspect}")
+    end
+
+    parts.join(', ')
+  end
+
   # Error class representing a process's abnormal exit.
   class NonZeroExit < StandardError
     # @!attribute [r] command
