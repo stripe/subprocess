@@ -509,18 +509,21 @@ module Subprocess
     end
 
     private
-    # Return a pair of values (child, ext), which are how the given file
-    # descriptor should appear to the child and the external world. ext is only
-    # non-nil in the case of a pipe (in fact, we just return a list of length
-    # one, since ruby will unpack nils from missing list items).
+    # Return a pair of values (child, mine), which are how the given file
+    # descriptor should appear to the child and to this process, respectively.
+    # "mine" is only non-nil in the case of a pipe (in fact, we just return a
+    # list of length one, since ruby will unpack nils from missing list items).
+    #
+    # If you pass either an IO or an Integer (i.e., a raw file descriptor), a
+    # private copy of it will be made using `#dup`.
     def parse_fd(fd, mode)
-      ret = case fd
+      fds = case fd
       when PIPE
         IO.pipe
       when IO
-        [fd]
+        [fd.dup]
       when Integer
-        [IO.new(fd, mode)]
+        [IO.new(fd, mode).dup]
       when String
         [File.open(fd, mode)]
       when nil
@@ -529,7 +532,7 @@ module Subprocess
         raise ArgumentError
       end
 
-      mode == 'r' ? ret : ret.reverse
+      mode == 'r' ? fds : fds.reverse
     end
 
     def mark_fd_cloexec(fd)
