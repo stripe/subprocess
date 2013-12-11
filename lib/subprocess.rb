@@ -109,17 +109,15 @@ module Subprocess
         sig_num = status.exitstatus - 128
 
         # sigh, why is ruby so silly
-        begin
+        if Signal.respond_to?(:signame)
           # ruby 2.0 way
           sig_name = Signal.signame(sig_num)
-        rescue NoMethodError
-          begin
-            # ruby 1.9 way
-            sig_name = Signal.list.key(sig_num)
-          rescue NoMethodError
-            # ruby 1.8 way
-            sig_name = Signal.list.index(sig_num)
-          end
+        elsif Signal.list.respond_to?(:key)
+          # ruby 1.9 way
+          sig_name = Signal.list.key(sig_num)
+        else
+          # ruby 1.8 way
+          sig_name = Signal.list.index(sig_num)
         end
 
         if sig_name
