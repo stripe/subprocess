@@ -1,6 +1,8 @@
 Subprocess
 ==========
 
+![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
+
 A port of Python's excellent subprocess module to Ruby.
 
 Many thanks to [Bram Swenson][bram], the author of the old [subprocess][old]
