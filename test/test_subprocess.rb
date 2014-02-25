@@ -19,6 +19,12 @@ describe Subprocess do
       p.must_be_instance_of(Subprocess::Process)
       p.wait
     end
+
+    it 'complains when not given an Array' do
+      lambda {
+        Subprocess.popen("not an Array")
+      }.must_raise(ArgumentError)
+    end
   end
 
   describe '.call' do

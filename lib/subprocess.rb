@@ -98,7 +98,6 @@ module Subprocess
   # @return [String] Text interpretation
   #
   def self.status_to_s(status, convert_high_exit=true)
-
     # use an array just in case we somehow get a status with all the bits set
     parts = []
     if status.exited?
@@ -196,7 +195,8 @@ module Subprocess
     # Create a new process.
     #
     # @param [Array<String>] cmd The command to run and its arguments (in the
-    #   style of an `argv` array).
+    #   style of an `argv` array). Unlike Python's subprocess module, `cmd`
+    #   cannnot be a String.
     #
     # @option opts [IO, Fixnum, String, Subprocess::PIPE, nil] :stdin The `IO`,
     #   file descriptor number, or file name to use for the process's standard
@@ -234,6 +234,8 @@ module Subprocess
     #   in conjunction with {Subprocess::check_call}.
     # @yieldparam process [Process] The process that was just spawned.
     def initialize(cmd, opts={}, &blk)
+      raise ArgumentError, "cmd must be an Array" unless Array === cmd
+
       @command = cmd
 
       # Figure out what file descriptors we should pass on to the child (and
