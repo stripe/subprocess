@@ -367,6 +367,9 @@ module Subprocess
       begin
         e = Marshal.load(control_r)
         e = "Unknown Failure" unless e.is_a?(Exception) || e.is_a?(String)
+        # Because we're throwing an exception and not returning a
+        # Process, we need to make sure the child gets reaped
+        wait
         raise e
       rescue EOFError # Nothing to read? Great!
       ensure
