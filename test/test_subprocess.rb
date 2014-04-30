@@ -260,5 +260,21 @@ describe Subprocess do
       end
       (Time.now - start).must_be_close_to(2.0, 0.2)
     end
+
+    it "doesn't leak children when throwing errors" do
+      lambda {
+        Subprocess.call(['/not/a/file', ':('])
+      }.must_raise(Errno::ENOENT)
+
+      ps_pid = 0
+      procs = Subprocess.check_output(['ps', '-o', 'pid ppid']) do |p|
+        ps_pid = p.pid
+      end
+
+      pid_table = procs.split("\n")[1..-1].map{ |l| l.split(' ').map(&:to_i) }
+      children = pid_table.find_all{ |pid, ppid| ppid == $$ && pid != ps_pid }
+
+      children.must_equal([])
+    end
   end
 end
