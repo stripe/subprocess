@@ -360,9 +360,10 @@ module Subprocess
       # Meanwhile, in the parent process...
 
       # First, let's close some things we shouldn't have access to
-      [@child_stdin, @child_stdout, @child_stderr, control_w].each do |fd|
-        fd.close unless fd.nil?
-      end
+      @child_stdin.close if our_fd?(opts[:stdin])
+      @child_stdout.close if our_fd?(opts[:stdout])
+      @child_stderr.close if our_fd?(opts[:stderr])
+      control_w.close
 
       # Any errors during the spawn process? We'll get past this point when the
       # child execs and the OS closes control_w because of the FD_CLOEXEC
@@ -516,17 +517,14 @@ module Subprocess
     # descriptor should appear to the child and to this process, respectively.
     # "mine" is only non-nil in the case of a pipe (in fact, we just return a
     # list of length one, since ruby will unpack nils from missing list items).
-    #
-    # If you pass either an IO or an Integer (i.e., a raw file descriptor), a
-    # private copy of it will be made using `#dup`.
     def parse_fd(fd, mode)
       fds = case fd
       when PIPE
         IO.pipe
       when IO
-        [fd.dup]
+        [fd]
       when Integer
-        [IO.new(fd, mode).dup]
+        [IO.new(fd, mode)]
       when String
         [File.open(fd, mode)]
       when nil
@@ -536,6 +534,17 @@ module Subprocess
       end
 
       mode == 'r' ? fds : fds.reverse
+    end
+
+    # The pair to parse_fd, returns whether or not the file descriptor was
+    # opened by us (and therefore should be closed by us).
+    def our_fd?(fd)
+      case fd
+      when PIPE, String
+        true
+      else
+        false
+      end
     end
 
     def mark_fd_cloexec(fd)

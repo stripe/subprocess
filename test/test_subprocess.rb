@@ -136,20 +136,6 @@ describe Subprocess do
       tmp.delete
     end
 
-    it 'makes a private copy of IOs' do
-      f = File.open(__FILE__)
-      tmp = Tempfile.new('test')
-      Subprocess.check_call(['cat'], :stdin => f, :stdout => tmp.open)
-      f.read.must_equal(tmp.read)
-    end
-
-    it 'makes a private copy of fds' do
-      f = File.open(__FILE__)
-      tmp = Tempfile.new('test')
-      Subprocess.check_call(['cat'], :stdin => f.fileno, :stdout => tmp.fileno)
-      f.read.must_equal(tmp.read)
-    end
-
     it 'opens pipes for communication' do
       Subprocess.check_call(['cat'], :stdin => Subprocess::PIPE,
                             :stdout => Subprocess::PIPE) do |p|
