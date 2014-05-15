@@ -1,5 +1,4 @@
-Subprocess
-==========
+# Subprocess [![Build Status](https://travis-ci.org/stripe/subprocess.svg?branch=master)](https://travis-ci.org/stripe/subprocess)
 
 ![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
 
