@@ -340,11 +340,17 @@ module Subprocess
           if cmd.length == 1
             args = ["'" + cmd[0].gsub("'", "\\'") + "'"]
           end
-          if opts[:retain_fds]
+
+          # Ruby 1.9 changed the behavior of file descriptor retention in exec.
+          # It also conveniently added the related spawn function, so
+          # conditionalize on the presence of that in order to determine whether
+          # or not we need to add the extra argument.
+          if opts[:retain_fds] && Kernel.respond_to?(:spawn)
             redirects = {}
             retained_fds.each { |fd| redirects[fd] = fd }
             args << redirects
           end
+
           exec(*args)
 
         rescue Exception => e
