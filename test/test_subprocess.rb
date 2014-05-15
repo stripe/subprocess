@@ -193,7 +193,7 @@ describe Subprocess do
     it 'retains files when asked' do
       fd = File.open("/dev/null")
       Subprocess.check_call(['cat', '/dev/fd/' + fd.fileno.to_s],
-                            :retain_fds => [fd])
+                            :retain_fds => [fd.fileno])
     end
 
     it 'calls the preexec_fn in the child process' do
