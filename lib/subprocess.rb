@@ -1,5 +1,6 @@
 require 'thread'
 require 'set'
+require 'json'
 
 require 'subprocess/version'
 
@@ -283,8 +284,10 @@ module Subprocess
           exec([cmd[0], cmd[0]], *cmd[1..-1], options)
 
         rescue Exception => e
-          # Dump all errors up to the parent through the control socket
-          Marshal.dump(e, control_w)
+          # Dump all errors up to the parent through the control socket. Only
+          # return the exception's class, not the namespace it's contained in.
+          JSON.dump({"exception" => e.class.name.split("::").last,
+                     "message" => e.message}, control_w)
           control_w.flush
         end
 
@@ -303,12 +306,22 @@ module Subprocess
       # Any errors during the spawn process? We'll get past this point when the
       # child execs and the OS closes control_w
       begin
-        e = Marshal.load(control_r)
-        e = "Unknown Failure" unless e.is_a?(Exception) || e.is_a?(String)
+        # We can't use JSON.load, because it throws a JSON::ParserError if you
+        # close it's pipe underneath it, and catching that seems awfully
+        # hamfisted.
+        payload = control_r.sysread(1024)
+        e = JSON.load(payload)
+        msg = e["message"] || "Unknown Failure"
+
+        if e.include? "exception"
+          exc = safe_exception(e["exception"])
+        else
+          exc = Exception
+        end
         # Because we're throwing an exception and not returning a
         # Process, we need to make sure the child gets reaped
         wait
-        raise e
+        raise exc.new(msg)
       rescue EOFError # Nothing to read? Great!
       ensure
         control_r.close
@@ -316,6 +329,19 @@ module Subprocess
 
       # Everything is okay. Good job, team!
       blk.call(self) if blk
+    end
+
+    def safe_exception(sym)
+      # Old versions of rubby can't const_get into modules (eg, Errno::EINTR),
+      # so we helpfully search the toplevel namespace, and Errno for the
+      # exception class
+      exc = Errno.const_get(sym) if Errno.const_defined?(sym)
+      exc = Kernel.const_get(sym) if Kernel.const_defined?(sym)
+      if exc && exc.ancestors.include?(Exception)
+        exc
+      else
+        Exception
+      end
     end
 
     # Poll the child, setting (and returning) its status. If the child has not
