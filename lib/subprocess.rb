@@ -377,7 +377,7 @@ module Subprocess
         wait_r = [@stdout, @stderr, self_read].compact
         wait_w = [input && @stdin].compact
         loop do
-          ready_r, ready_w = select(wait_r, wait_w)
+          ready_r, ready_w = select(wait_r, wait_w, [], 1)
 
           # If the child exits, we still have to be sure to read any data left
           # in the pipes. So we poll the child, drain all the pipes, and *then*
