@@ -338,7 +338,7 @@ module Subprocess
           # expansion. So this is the next best thing.
           args = cmd
           if cmd.length == 1
-            args = ["'" + cmd[0].gsub("'", "\\'") + "'"]
+            args = ['/bin/sh', '-c', "exec '" + cmd[0].gsub("'", "\\'") + "'"]
           end
 
           # Ruby 1.9 changed the behavior of file descriptor retention in exec.
