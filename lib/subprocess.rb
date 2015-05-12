@@ -218,12 +218,11 @@ module Subprocess
     #   numbers that should not be closed before executing the child process.
     #   Note that, unlike Python (which has :close_fds defaulting to false), all
     #   file descriptors not specified here will be closed.
+    # @option opts [Hash] :exec_opts A hash that will be merged into the options
+    #   hash of the call to {Kernel#exec}.
     #
     # @option opts [Proc] :preexec_fn A function that will be called in the
-    #   child process immediately before executing `cmd`. Note: we don't
-    #   actually close file descriptors, but instead set them to auto-close on
-    #   `exec` (using `FD_CLOEXEC`), so your application will probably continue
-    #   to behave as expected.
+    #   child process immediately before executing `cmd`.
     #
     # @yield [process] Yields the just-spawned {Process} to the optional block.
     #   This occurs after all of {Process}'s error handling has been completed,
@@ -251,60 +250,8 @@ module Subprocess
 
       @pid = fork do
         begin
-          require 'fcntl'
-
           FileUtils.cd(opts[:cwd]) if opts[:cwd]
 
-          # We have a whole ton of file descriptors that we don't want leaking
-          # into the child. Set them all to close when we exec away.
-          #
-          # Ruby 1.9+ note: exec has a :close_others argument (and 2.0 closes
-          # FDs by default). When we stop supporting Ruby 1.8, all of this can
-          # go away.
-          if File.directory?("/dev/fd")
-            # On many modern UNIX-y systems, we can perform an optimization by
-            # looking through /dev/fd, which is a sparse listing of all the
-            # descriptors we have open. This allows us to avoid an expensive
-            # linear scan.
-            Dir.foreach("/dev/fd") do |file|
-              fd = file.to_i
-              if file.start_with?('.') || fd < 3 || retained_fds.include?(fd)
-                next
-              end
-              begin
-                mark_fd_cloexec(fd)
-              rescue Errno::EBADF
-                # The fd might have been closed by now; that's peaceful.
-              end
-            end
-          else
-            # This is the big hammer. There's not really a good way of doing
-            # this comprehensively across all platforms without just trying them
-            # all. We only go up to the soft limit here. If you've been messing
-            # with the soft limit, we might miss a few. Also, on OSX (perhaps
-            # BSDs in general?), where the soft limit means something completely
-            # different.
-            special = [@child_stdin, @child_stdout, @child_stderr].compact
-            special = Hash[special.map { |f| [f.fileno, f] }]
-            3.upto(::Process.getrlimit(::Process::RLIMIT_NOFILE).first) do |fd|
-              next if retained_fds.include?(fd)
-              begin
-                # I don't know why we need to do this, but OSX started freaking
-                # out when trying to dup2 below if FD_CLOEXEC had been set on a
-                # fresh IO instance referring to the same underlying file
-                # descriptor as what we were trying to dup2 from.
-                if special[fd]
-                  special[fd].fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
-                else
-                  mark_fd_cloexec(fd)
-                end
-              rescue Errno::EBADF # Ignore FDs that don't exist
-              end
-            end
-          end
-
-          # dup2 the correct descriptors into place. Note that this clears the
-          # FD_CLOEXEC flag on the new file descriptors (but not the old ones).
           ::STDIN.reopen(@child_stdin) if @child_stdin
           ::STDOUT.reopen(@child_stdout) if @child_stdout
           if opts[:stderr] == STDOUT
@@ -322,25 +269,18 @@ module Subprocess
           # Call the user back, maybe?
           opts[:preexec_fn].call if opts[:preexec_fn]
 
+          options = {close_others: true}.merge(opts.fetch(:exec_opts, {}))
+          if opts[:retain_fds]
+            retained_fds.each { |fd| options[fd] = fd }
+          end
+
           # Ruby's Kernel#exec will call an exec(3) variant if called with two
           # or more arguments, but when called with just a single argument will
           # spawn a subshell with that argument as the command. Since we always
           # want to call exec(3), we use the third exec form, which passes a
           # [cmdname, argv0] array as its first argument and never invokes a
           # subshell.
-          args = [[cmd[0], cmd[0]], *cmd[1..-1]]
-
-          # Ruby 1.9 changed the behavior of file descriptor retention in exec.
-          # It also conveniently added the related spawn function, so
-          # conditionalize on the presence of that in order to determine whether
-          # or not we need to add the extra argument.
-          if opts[:retain_fds] && Kernel.respond_to?(:spawn)
-            redirects = {}
-            retained_fds.each { |fd| redirects[fd] = fd }
-            args << redirects
-          end
-
-          exec(*args)
+          exec([cmd[0], cmd[0]], *cmd[1..-1], options)
 
         rescue Exception => e
           # Dump all errors up to the parent through the control socket
@@ -361,7 +301,7 @@ module Subprocess
       control_w.close
 
       # Any errors during the spawn process? We'll get past this point when the
-      # child execs and the OS closes control_w because of the FD_CLOEXEC
+      # child execs and the OS closes control_w
       begin
         e = Marshal.load(control_r)
         e = "Unknown Failure" unless e.is_a?(Exception) || e.is_a?(String)
@@ -540,16 +480,6 @@ module Subprocess
       else
         false
       end
-    end
-
-    def mark_fd_cloexec(fd)
-      io = IO.new(fd, autoclose: false)
-      io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
-      io
-    rescue ArgumentError => e
-      # Ruby maintains a self-pipe for thread interrupts, but it handles closing
-      # it on forks/execs
-      raise unless e.message == "The given fd is not accessible because RubyVM reserves it"
     end
 
     @sigchld_mutex = Mutex.new
