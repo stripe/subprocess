@@ -235,6 +235,7 @@ module Subprocess
     # @yieldparam process [Process] The process that was just spawned.
     def initialize(cmd, opts={}, &blk)
       raise ArgumentError, "cmd must be an Array" unless Array === cmd
+      raise ArgumentError, "cmd cannot be empty" if cmd.empty?
 
       @command = cmd
 
@@ -333,13 +334,13 @@ module Subprocess
           # Call the user back, maybe?
           opts[:preexec_fn].call if opts[:preexec_fn]
 
-          # Ruby 1.8's exec is really stupid--there's no way to specify that
-          # you want to exec a single thing *without* performing shell
-          # expansion. So this is the next best thing.
-          args = cmd
-          if cmd.length == 1
-            args = ["'" + cmd[0].gsub("'", "\\'") + "'"]
-          end
+          # Ruby's Kernel#exec will call an exec(3) variant if called with two
+          # or more arguments, but when called with just a single argument will
+          # spawn a subshell with that argument as the command. Since we always
+          # want to call exec(3), we use the third exec form, which passes a
+          # [cmdname, argv0] array as its first argument and never invokes a
+          # subshell.
+          args = [[cmd[0], cmd[0]], *cmd[1..-1]]
 
           # Ruby 1.9 changed the behavior of file descriptor retention in exec.
           # It also conveniently added the related spawn function, so
