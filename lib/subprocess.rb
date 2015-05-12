@@ -255,15 +255,6 @@ module Subprocess
 
           FileUtils.cd(opts[:cwd]) if opts[:cwd]
 
-          # The only way to mark an fd as CLOEXEC in ruby is to create an IO
-          # object wrapping it. In 1.8, however, there's no way to create that
-          # IO without it believing it owns the underlying fd, s.t. it will
-          # close the fd if the IO is GC'd before the exec. Since we don't want
-          # that, we stash a list of these IO objects to prevent them from
-          # getting GC'd, since we are about to exec, which will clean
-          # everything up anyways.
-          fds = []
-
           # We have a whole ton of file descriptors that we don't want leaking
           # into the child. Set them all to close when we exec away.
           #
@@ -281,7 +272,7 @@ module Subprocess
                 next
               end
               begin
-                fds << mark_fd_cloexec(fd)
+                mark_fd_cloexec(fd)
               rescue Errno::EBADF
                 # The fd might have been closed by now; that's peaceful.
               end
@@ -305,7 +296,7 @@ module Subprocess
                 if special[fd]
                   special[fd].fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
                 else
-                  fds << mark_fd_cloexec(fd)
+                  mark_fd_cloexec(fd)
                 end
               rescue Errno::EBADF # Ignore FDs that don't exist
               end
@@ -552,7 +543,7 @@ module Subprocess
     end
 
     def mark_fd_cloexec(fd)
-      io = IO.new(fd)
+      io = IO.new(fd, autoclose: false)
       io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
       io
     rescue ArgumentError => e
