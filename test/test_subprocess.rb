@@ -54,6 +54,11 @@ describe Subprocess do
     it 'returns a non-successful status when calling false' do
       Subprocess.call(['false']).success?.must_equal(false)
     end
+
+    it "doesn't spawn a subshell when passed a single argument" do
+      script = File.join(File.dirname(__FILE__), 'bin', 'ppid')
+      Subprocess.check_output([script]).strip.must_equal($$.to_s)
+    end
   end
 
   describe '.check_call' do
