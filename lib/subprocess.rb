@@ -107,14 +107,7 @@ module Subprocess
         # been according to the usual exit status convention
         sig_num = status.exitstatus - 128
 
-        # sigh, why is ruby so silly
-        if Signal.respond_to?(:signame)
-          # ruby 2.0 way
-          sig_name = Signal.signame(sig_num)
-        else
-          # ruby 1.9 way
-          sig_name = Signal.list.key(sig_num)
-        end
+        sig_name = Signal.signame(sig_num)
 
         if sig_name
           parts << "(maybe SIG#{sig_name})"
