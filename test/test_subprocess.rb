@@ -90,6 +90,82 @@ describe Subprocess do
     end
   end
 
+  describe 'capture_output_for_err_msg option' do
+    ['check_call', 'check_output'].each do |method|
+      describe "for #{method}" do
+        it 'includes stderr in the error message when capture_output_for_err_msg is true' do
+          err = assert_raises(Subprocess::NonZeroExit) do
+            Subprocess.public_send(method,
+              ['ruby', '-e', 'abort("fubar")'],
+              capture_output_for_err_msg: true,
+            )
+          end
+          assert_equal(
+            "Command ruby -e abort(\"fubar\") returned non-zero exit status 1. Stderr output:\nfubar",
+            err.message
+          )
+        end
+
+        it 'includes stdout in the error message when capture_output_for_err_msg is true and stderr has no output' do
+          err = assert_raises(Subprocess::NonZeroExit) do
+            Subprocess.public_send(method,
+              ['ruby', '-e', 'puts "fubar"; exit(1)'],
+              capture_output_for_err_msg: true,
+            )
+          end
+          assert_equal(
+            "Command ruby -e puts \"fubar\"; exit(1) returned non-zero exit status 1. " \
+            "No output to stderr. Stdout output:\nfubar",
+            err.message
+          )
+        end
+
+        it 'truncates the error message when stdout is too long' do
+          err = assert_raises(Subprocess::NonZeroExit) do
+            Subprocess.public_send(method,
+              ['ruby', '-e', 'print "x" * 2000; exit(1)'],
+              capture_output_for_err_msg: true,
+            )
+          end
+          assert_equal(
+            "Command ruby -e print \"x\" * 2000; exit(1) returned non-zero exit status 1. " \
+            "No output to stderr. Stdout output:\n[truncated 976 chars above]\n#{'x' * 1024}",
+            err.message
+          )
+        end
+
+        it 'does not include stderr in the error message when capture_output_for_err_msg is unset' do
+          err = nil
+          _output, err_output = capture_subprocess_io do
+            err = assert_raises(Subprocess::NonZeroExit) do
+              Subprocess.public_send(method,
+                ['ruby', '-e', 'abort("fubar")'],
+              )
+            end
+          end
+          assert_equal(
+            "Command ruby -e abort(\"fubar\") returned non-zero exit status 1",
+            err.message
+          )
+          assert_equal("fubar", err_output.chomp)
+        end
+
+        it 'does not include stderr in the error message when capture_output_for_err_msg is unset and stderr is a pipe' do
+          err = assert_raises(Subprocess::NonZeroExit) do
+            Subprocess.public_send(method,
+              ['ruby', '-e', 'abort("fubar")'],
+              stderr: Subprocess::PIPE,
+            )
+          end
+          assert_equal(
+            "Command ruby -e abort(\"fubar\") returned non-zero exit status 1",
+            err.message
+          )
+        end
+      end
+    end
+  end
+
   describe Subprocess::Process do
     it 'sets command' do
       command = ['echo', 'all', 'your', 'llamas', 'are', 'belong', 'to', 'us']
