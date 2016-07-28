@@ -1,4 +1,4 @@
-# Subprocess [![Build Status](https://travis-ci.org/stripe/subprocess.svg?branch=master)](https://travis-ci.org/stripe/subprocess)
+# Subprocess [![Build Status](https://travis-ci.org/stripe/subprocess.svg?branch=master)](https://travis-ci.org/stripe/subprocess) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess/Subprocess)
 
 ![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
 
