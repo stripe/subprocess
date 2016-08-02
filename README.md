@@ -1,14 +1,8 @@
-# Subprocess [![Build Status](https://travis-ci.org/stripe/subprocess.svg?branch=master)](https://travis-ci.org/stripe/subprocess)
+# Subprocess [![Build Status](https://travis-ci.org/stripe/subprocess.svg?branch=master)](https://travis-ci.org/stripe/subprocess) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess/Subprocess)
 
 ![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
 
-A port of Python's excellent subprocess module to Ruby.
-
-Many thanks to [Bram Swenson][bram], the author of the old [subprocess][old]
-gem, for graciously letting us use the name.
-
-[bram]: https://github.com/bramswenson
-[old]: https://github.com/bramswenson/subprocess
+A solid subprocess library for ruby, inspired by python's.
 
 Installation
 ------------
@@ -21,20 +15,10 @@ You can also build `subprocess` from source by running:
 
     $ gem build subprocess.gemspec
 
-
 Usage
 -----
 
-Most of the documentation for Python's [subprocess][python] module applies
-equally well to this gem as well. While there are a few places when our
-semantics differs from Python's, users of the Python module should largely feel
-at home using `subprocess`. We have attempted to [document][rubydoc] all of the
-differences, but if we have missed something, please file an issue.
-
-[python]: http://docs.python.org/library/subprocess.html
-[rubydoc]: http://rubydoc.info/github/stripe/subprocess
-
-A few examples:
+Full documentation is on [RubyDoc][rubydoc]. A few examples:
 
 ```ruby
 require 'subprocess'
@@ -71,3 +55,21 @@ http://upload.wikimedia.org/wikipedia/commons/3/3e/Unshorn_alpaca_grazing.jpg
   EMAIL
 end
 ```
+
+Most of the documentation for Python's [subprocess][python] module applies
+equally well to this gem as well. While there are a few places when our
+semantics differs from Python's, users of the Python module should largely feel
+at home using `subprocess`. We have attempted to [document][rubydoc] all of the
+differences, but if we have missed something, please file an issue.
+
+[python]: http://docs.python.org/library/subprocess.html
+[rubydoc]: http://rubydoc.info/github/stripe/subprocess/Subprocess
+
+Acknowledgements
+----------------
+
+Many thanks to [Bram Swenson][bram], the author of the old [subprocess][old]
+gem, for graciously letting us use the name.
+
+[bram]: https://github.com/bramswenson
+[old]: https://github.com/bramswenson/subprocess
