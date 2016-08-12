@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'thread'
 require 'set'
 
