@@ -1,3 +1,4 @@
+# coding: utf-8
 require 'rubygems'
 gem 'minitest'
 require 'minitest/autorun'
@@ -266,6 +267,12 @@ describe Subprocess do
       children = pid_table.find_all{ |pid, ppid| ppid == $$ && pid != ps_pid }
 
       children.must_equal([])
+    end
+
+    it "properly encodes output strings" do
+      test_string = 'aå'
+      output = Subprocess.check_output(['echo', '-n', test_string])
+      output.must_equal(test_string)
     end
   end
 end

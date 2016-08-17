@@ -362,6 +362,9 @@ module Subprocess
       raise ArgumentError if !input.nil? && @stdin.nil?
 
       stdout, stderr = "", ""
+      stdout_encoding = @stdout.external_encoding if @stdout
+      stderr_encoding = @stderr.external_encoding if @stderr
+
       input = input.dup unless input.nil?
 
       @stdin.close if (input.nil? || input.empty?) && !@stdin.nil?
@@ -422,6 +425,9 @@ module Subprocess
       end
 
       wait
+
+      stdout.force_encoding(stdout_encoding) if stdout_encoding
+      stderr.force_encoding(stderr_encoding) if stderr_encoding
 
       [stdout, stderr]
     end
