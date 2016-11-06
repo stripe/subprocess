@@ -187,7 +187,7 @@ module Subprocess
     #
     # @param [Array<String>] cmd The command to run and its arguments (in the
     #   style of an `argv` array). Unlike Python's subprocess module, `cmd`
-    #   cannnot be a String.
+    #   cannot be a String.
     #
     # @option opts [IO, Fixnum, String, Subprocess::PIPE, nil] :stdin The `IO`,
     #   file descriptor number, or file name to use for the process's standard
