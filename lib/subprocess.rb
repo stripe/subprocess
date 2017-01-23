@@ -409,6 +409,13 @@ module Subprocess
               written = @stdin.write_nonblock(input)
             rescue EOFError # Maybe I shouldn't catch this...
             rescue Errno::EINTR
+            rescue IO::WaitWritable
+              # On OS X, a pipe can raise EAGAIN even after select indicates
+              # that it is writable. Once the process consumes from the pipe,
+              # the next write should succeed and we should make forward progress.
+              # Until then, treat this as not writing any bytes and continue looping.
+              # For details see: https://github.com/stripe/subprocess/pull/22
+              written = 0
             end
             input[0...written] = ''
             if input.empty?
