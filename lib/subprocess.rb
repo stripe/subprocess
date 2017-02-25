@@ -376,16 +376,6 @@ module Subprocess
         loop do
           ready_r, ready_w = select(wait_r, wait_w)
 
-          # If the child exits, we still have to be sure to read any data left
-          # in the pipes. So we poll the child, drain all the pipes, and *then*
-          # check @status.
-          #
-          # It's very important that we do not call poll between draining the
-          # pipes and checking @status. If we did, we open a race condition
-          # where the child writes to stdout and exits in that brief window,
-          # causing us to lose that data.
-          poll
-
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
               wait_r.delete(@stdout)
@@ -424,10 +414,9 @@ module Subprocess
             end
           end
 
-          break if @status
-
-          # If there's nothing left to wait for, we're done!
-          break if wait_r.length == 0 && wait_w.length == 0
+          # If the process has exited and we're not waiting to read anything
+          # other than the self pipe, then we're done.
+          break if poll && (wait_r.length == 0 || wait_r == [self_read])
         end
       end
 
