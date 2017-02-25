@@ -395,6 +395,7 @@ module Subprocess
           end
 
           if ready_w.include?(@stdin)
+            written = 0
             begin
               written = @stdin.write_nonblock(input)
             rescue EOFError # Maybe I shouldn't catch this...
@@ -405,7 +406,13 @@ module Subprocess
               # the next write should succeed and we should make forward progress.
               # Until then, treat this as not writing any bytes and continue looping.
               # For details see: https://github.com/stripe/subprocess/pull/22
-              written = 0
+              nil
+            rescue Errno::EPIPE
+              # The other side of the pipe closed before we could
+              # write all of our input. This can happen if the
+              # process exits prematurely.
+              @stdin.close
+              wait_w.delete(@stdin)
             end
             input[0...written] = ''
             if input.empty?
@@ -416,7 +423,7 @@ module Subprocess
 
           # If the process has exited and we're not waiting to read anything
           # other than the self pipe, then we're done.
-          break if poll && (wait_r.length == 0 || wait_r == [self_read])
+          break if poll && wait_r == [self_read]
         end
       end
 
