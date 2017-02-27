@@ -374,7 +374,7 @@ module Subprocess
         wait_r = [@stdout, @stderr, self_read].compact
         wait_w = [input && @stdin].compact
         loop do
-          ready_r, ready_w = select(wait_r, wait_w)
+          ready_r, ready_w = select(wait_r, wait_w, [], 1)
 
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
