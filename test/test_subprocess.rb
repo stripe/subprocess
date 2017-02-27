@@ -233,6 +233,17 @@ describe Subprocess do
       end
     end
 
+    it 'should not raise an error when the process exits before we finish writing stdin' do
+      script = File.join(File.dirname(__FILE__), 'bin', 'closer.rb')
+      Subprocess.check_call(['ruby', script], :stdin => Subprocess::PIPE,
+                            :stdout => Subprocess::PIPE) do |p|
+        # Wait for the read on stdout to be available before we force a read to stdin
+        p.stdout.sysread(1)
+        stdout, _ = p.communicate('in')
+        stdout.must_equal("b\n")
+      end
+    end
+
     it 'has a license to kill' do
       start = Time.now
       lambda {

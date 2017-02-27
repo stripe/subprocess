@@ -407,12 +407,12 @@ module Subprocess
               # Until then, treat this as not writing any bytes and continue looping.
               # For details see: https://github.com/stripe/subprocess/pull/22
               nil
-            rescue Errno::EPIPE
+            # rescue Errno::EPIPE
               # The other side of the pipe closed before we could
               # write all of our input. This can happen if the
               # process exits prematurely.
-              @stdin.close
-              wait_w.delete(@stdin)
+              # @stdin.close
+              # wait_w.delete(@stdin)
             end
             input[0...written] = ''
             if input.empty?
