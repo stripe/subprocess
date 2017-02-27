@@ -233,6 +233,22 @@ describe Subprocess do
       end
     end
 
+    it 'should not raise an error when the process closes stdin before we finish writing' do
+      script = File.join(File.dirname(__FILE__), 'bin', 'closer.rb')
+      Subprocess.check_call(['bash', '-c', '<&-; echo -n "foo"; sleep 1'], :stdin => Subprocess::PIPE,
+                            :stdout => Subprocess::PIPE) do |p|
+        # Wait for the read on stdout to be available before we force a read to stdin
+        IO.select([p.stdout])
+
+        # Generate a 16MB string, which happens to be quite a bit bigger than
+        # the pipe buffers on all systems I know about. A naive solution here
+        # would deadlock pretty quickly.
+        string = "x" * 1024 * 1024 * 16
+        stdout, stderr = p.communicate(string)
+        stdout.must_equal("foo")
+      end
+    end
+
     it 'has a license to kill' do
       start = Time.now
       lambda {
