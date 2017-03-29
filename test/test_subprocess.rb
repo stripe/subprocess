@@ -4,6 +4,7 @@ gem 'minitest'
 require 'minitest/autorun'
 require 'subprocess'
 
+require 'timeout'
 require 'pathname'
 require 'tempfile'
 
@@ -230,6 +231,14 @@ describe Subprocess do
         string = "x" * 1024 * 1024 * 16
         stdout, stderr = p.communicate(string)
         stdout.must_equal(string)
+      end
+    end
+
+    it 'does not deadlock if you #communicate without any pipes' do
+      Timeout.timeout(5) do
+        p = Subprocess.popen(['true'])
+        p.wait
+        out, err = p.communicate
       end
     end
 

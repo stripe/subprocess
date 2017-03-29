@@ -374,6 +374,10 @@ module Subprocess
         wait_r = [@stdout, @stderr, self_read].compact
         wait_w = [input && @stdin].compact
         loop do
+          # If the process has exited and we're not waiting to read anything
+          # other than the self pipe, then we're done.
+          break if poll && wait_r == [self_read]
+
           ready_r, ready_w = select(wait_r, wait_w)
 
           if ready_r.include?(@stdout)
@@ -420,10 +424,6 @@ module Subprocess
               wait_w.delete(@stdin)
             end
           end
-
-          # If the process has exited and we're not waiting to read anything
-          # other than the self pipe, then we're done.
-          break if poll && wait_r == [self_read]
         end
       end
 
