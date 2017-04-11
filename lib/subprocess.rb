@@ -39,6 +39,10 @@ module Subprocess
   # Like {Subprocess::call}, except raise a {NonZeroExit} if the process did not
   # terminate successfully.
   #
+  # @option opts [Boolean] :capture_output_for_err_msg When true, capture stdout
+  # and stderr and add relevant output to the exception's message in the case of
+  # a NonZeroExit.
+  #
   # @example Grep a file for a string
   #   Subprocess.check_call(%W{grep -q llama ~/favorite_animals})
   #
@@ -65,13 +69,21 @@ module Subprocess
   #
   # @see {Process#initialize}
   def self.check_call(cmd, opts={}, &blk)
-    status = Process.new(cmd, opts, &blk).wait
-    raise NonZeroExit.new(cmd, status) unless status.success?
+    if opts[:capture_output_for_err_msg]
+      _output, _err_output, status = check_call_with_reading(cmd, opts, &blk)
+    else
+      status = Process.new(cmd, opts, &blk).wait
+      raise NonZeroExit.new(cmd, status) unless status.success?
+    end
     status
   end
 
   # Like {Subprocess::check_call}, but return the contents of `stdout`, much
   # like `Kernel#system`.
+  #
+  # @option opts [Boolean] :capture_output_for_err_msg When true, capture stdout
+  # and stderr and add relevant output to the exception's message in the case of
+  # a NonZeroExit.
   #
   # @example Get the system load
   #   system_load = Subprocess.check_output(['uptime']).split(' ').last(3)
@@ -83,10 +95,44 @@ module Subprocess
   # @see {Process#initialize}
   def self.check_output(cmd, opts={}, &blk)
     opts[:stdout] = PIPE
-    child = Process.new(cmd, opts, &blk)
-    output, _ = child.communicate()
-    raise NonZeroExit.new(cmd, child.status) unless child.wait.success?
+    output, _err_output, _status = check_call_with_reading(cmd, opts, &blk)
     output
+  end
+
+  # Like {Subprocess::check_call}, but works when passing `:stdout => PIPE`
+  # and/or `:stderr => PIPE`, and returns their output.
+  #
+  # @option opts [Boolean] :capture_output_for_err_msg When true, capture stdout
+  # and stderr and add relevant output to the exception's message in the case of
+  # a NonZeroExit.
+  #
+  #
+  # @raise [NonZeroExit] if the process returned a non-zero exit status (i.e.,
+  #   was terminated with an error or was killed by a signal)
+  # @return [Array(String, String, ::Process::Status)] The contents of `stdout`
+  #   (if captured, otherwise ''), the contents of `stderr` (if captured,
+  #   otherwise ''), and the exit status of the process.
+  #
+  # @see {Process#initialize}
+  def self.check_call_with_reading(cmd, opts={}, &blk)
+    if opts[:capture_output_for_err_msg]
+      [:stderr, :stdout].each do |opt|
+        if opts[opt] && opts[opt] != PIPE
+          raise ArgumentError.new(
+            "#{opt} can only be Subprocess::PIPE when capture_output_for_err_msg is true"
+          )
+        end
+        opts[opt] = PIPE
+      end
+    end
+
+    child = Process.new(cmd, opts, &blk)
+    output, err_output = child.communicate
+    status = child.wait
+    if !status.success?
+      raise NonZeroExit.new(cmd, child.status, output, err_output, opts[:capture_output_for_err_msg])
+    end
+    [output, err_output, status]
   end
 
   # Print a human readable interpretation of a process exit status.
@@ -140,14 +186,17 @@ module Subprocess
     #     abnormally.
     # @!attribute [r] status
     #   @return [::Process::Status] The Ruby status object returned by `waitpid`
-    attr_reader :command, :status
+    attr_reader :command, :status, :output, :err_output
 
     # Return an instance of {NonZeroExit}.
     #
     # @param [Array<String>] cmd The command that returned a non-zero status.
     # @param [::Process::Status] status The status returned by `waitpid`.
-    def initialize(cmd, status)
+    def initialize(cmd, status, output=nil, err_output=nil, use_output_in_message=false)
       @command, @status = cmd.join(' '), status
+      @output = output
+      @err_output = err_output
+
       message = "Command #{command} "
       if status.exited?
         message << "returned non-zero exit status #{status.exitstatus}"
@@ -158,7 +207,31 @@ module Subprocess
       else
         message << "exited for an unknown reason (FIXME)"
       end
+
+      if use_output_in_message
+        if err_output.empty?
+          if output.empty?
+            message << ". There was no output."
+          else
+            # For badly behaved commands (e.g. `bundle exec`), which output errors to stdout :(
+            message << ". No output to stderr. Stdout output:\n" + truncate_output(output).chomp
+          end
+        else
+          message << ". Stderr output:\n" + truncate_output(err_output).chomp
+        end
+      end
+
       super(message)
+    end
+
+    private
+
+    def truncate_output(output, max_len=1024)
+      extra_length = output.length - max_len
+      if extra_length > 0
+        output = "[truncated #{extra_length} chars above]\n" + output[-max_len..-1]
+      end
+      output
     end
   end
 
