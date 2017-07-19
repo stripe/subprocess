@@ -27,6 +27,16 @@ describe Subprocess do
         Subprocess.popen("not an Array")
       }.must_raise(ArgumentError)
     end
+
+    it 'complains with a helpful error when given arrays with invalid elements' do
+      exp = lambda {
+        Subprocess.popen(["not", [:allowed], 5])
+      }.must_raise(ArgumentError)
+      assert_equal(
+        "cmd must be an Array of strings (no implicit conversion of Array into String)",
+        exp.message
+      )
+    end
   end
 
   describe '.call' do
@@ -195,6 +205,17 @@ describe Subprocess do
       env = {"weather" => "warm and sunny"}
       out = Subprocess.check_output(['sh', '-c', 'echo $weather'], :env => env)
       out.chomp.must_equal(env['weather'])
+    end
+
+    it 'provides helpful error messages with invalid environment arguments' do
+      env = {symbol_key: "value"}
+      exp = lambda {
+        Subprocess.call(['false'], :env => env)
+      }.must_raise(ArgumentError)
+      assert_equal(
+        "`env` option must be a hash where all keys and values are strings (no implicit conversion of Symbol into String)",
+        exp.message
+      )
     end
 
     it 'retains files when asked' do
