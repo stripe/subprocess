@@ -505,7 +505,18 @@ module Subprocess
       @sigchld_fds.values.each do |fd|
         begin
           fd.write_nonblock("\x00")
-        rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+        rescue Errno::EWOULDBLOCK, Errno::EAGAIN, Errno::EPIPE
+          # If the pipe is full, the other end will be woken up
+          # regardless when it next reads, so it's fine to skip the
+          # write (the pipe is a wakeup channel, and doesn't contain
+          # meaningful data).
+          #
+          # We've seen EPIPE happen in production and don't fully
+          # understand it as of this writing, but if the other end has
+          # gone away, then there's no need to notify it and we'll
+          # just eat the error and move on. Plausibly we should remove
+          # the fd from `@sigchld_fds`, but since we don't have the
+          # lock I'm wary of trying to edit it.
         end
       end
     end
