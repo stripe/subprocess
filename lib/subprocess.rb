@@ -505,7 +505,7 @@ module Subprocess
       @sigchld_fds.values.each do |fd|
         begin
           fd.write_nonblock("\x00")
-        rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+        rescue Errno::EWOULDBLOCK, Errno::EAGAIN, Errno::EPIPE
         end
       end
     end
