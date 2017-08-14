@@ -1,4 +1,3 @@
-require 'fileutils'
 require 'thread'
 require 'set'
 
@@ -244,46 +243,45 @@ module Subprocess
 
       @pid = fork do
         begin
-          FileUtils.cd(opts[:cwd]) if opts[:cwd]
+          with_optional_cwd(opts[:cwd]) do
+            ::STDIN.reopen(@child_stdin) if @child_stdin
+            ::STDOUT.reopen(@child_stdout) if @child_stdout
+            if opts[:stderr] == STDOUT
+              ::STDERR.reopen(::STDOUT)
+            else
+              ::STDERR.reopen(@child_stderr) if @child_stderr
+            end
 
-          ::STDIN.reopen(@child_stdin) if @child_stdin
-          ::STDOUT.reopen(@child_stdout) if @child_stdout
-          if opts[:stderr] == STDOUT
-            ::STDERR.reopen(::STDOUT)
-          else
-            ::STDERR.reopen(@child_stderr) if @child_stderr
-          end
+            # Set up a new environment if we're requested to do so.
+            if opts[:env]
+              ENV.clear
+              begin
+                ENV.update(opts[:env])
+              rescue TypeError => e
+                raise ArgumentError, "`env` option must be a hash where all keys and values are strings (#{e})"
+              end
+            end
 
-          # Set up a new environment if we're requested to do so.
-          if opts[:env]
-            ENV.clear
+            # Call the user back, maybe?
+            opts[:preexec_fn].call if opts[:preexec_fn]
+
+            options = {close_others: true}.merge(opts.fetch(:exec_opts, {}))
+            if opts[:retain_fds]
+              retained_fds.each { |fd| options[fd] = fd }
+            end
+
             begin
-              ENV.update(opts[:env])
+              # Ruby's Kernel#exec will call an exec(3) variant if called with two
+              # or more arguments, but when called with just a single argument will
+              # spawn a subshell with that argument as the command. Since we always
+              # want to call exec(3), we use the third exec form, which passes a
+              # [cmdname, argv0] array as its first argument and never invokes a
+              # subshell.
+              exec([cmd[0], cmd[0]], *cmd[1..-1], options)
             rescue TypeError => e
-              raise ArgumentError, "`env` option must be a hash where all keys and values are strings (#{e})"
+              raise ArgumentError, "cmd must be an Array of strings (#{e})"
             end
           end
-
-          # Call the user back, maybe?
-          opts[:preexec_fn].call if opts[:preexec_fn]
-
-          options = {close_others: true}.merge(opts.fetch(:exec_opts, {}))
-          if opts[:retain_fds]
-            retained_fds.each { |fd| options[fd] = fd }
-          end
-
-          begin
-            # Ruby's Kernel#exec will call an exec(3) variant if called with two
-            # or more arguments, but when called with just a single argument will
-            # spawn a subshell with that argument as the command. Since we always
-            # want to call exec(3), we use the third exec form, which passes a
-            # [cmdname, argv0] array as its first argument and never invokes a
-            # subshell.
-            exec([cmd[0], cmd[0]], *cmd[1..-1], options)
-          rescue TypeError => e
-            raise ArgumentError, "cmd must be an Array of strings (#{e})"
-          end
-
         rescue Exception => e
           # Dump all errors up to the parent through the control socket
           Marshal.dump(e, control_w)
@@ -544,6 +542,14 @@ module Subprocess
       yield
     ensure
       unregister_pid(pid)
+    end
+
+    def with_optional_cwd(cwd, &block)
+      if cwd
+        Dir.chdir(cwd, &block)
+      else
+        yield
+      end
     end
   end
 end
