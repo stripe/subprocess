@@ -235,6 +235,20 @@ describe Subprocess do
       end
     end
 
+    it 'calls the preexec_fn in the correct working directory' do
+      # We write over a pipe that only we know about
+      r, w = IO.pipe
+      fn = Proc.new { w.write(Dir.pwd) }
+      Dir.mktmpdir do |dir|
+        real = Pathname.new(dir).realpath.to_s
+        Subprocess.check_call(['true'], :preexec_fn => fn, :cwd => real) do |p|
+          w.close
+          r.read.must_equal(real)
+          r.close
+        end
+      end
+    end
+
     it 'does not block when you call poll' do
       start = Time.now
       p = Subprocess::Process.new(['sleep', '1'])
