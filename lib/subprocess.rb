@@ -1,4 +1,3 @@
-require 'fileutils'
 require 'thread'
 require 'set'
 
@@ -244,8 +243,6 @@ module Subprocess
 
       @pid = fork do
         begin
-          FileUtils.cd(opts[:cwd]) if opts[:cwd]
-
           ::STDIN.reopen(@child_stdin) if @child_stdin
           ::STDOUT.reopen(@child_stdout) if @child_stdout
           if opts[:stderr] == STDOUT
@@ -265,11 +262,23 @@ module Subprocess
           end
 
           # Call the user back, maybe?
-          opts[:preexec_fn].call if opts[:preexec_fn]
+          if opts[:preexec_fn]
+            if opts[:cwd]
+              Dir.chdir(opts[:cwd], &opts[:preexec_fn])
+            else
+              opts[:preexec_fn].call
+            end
+          end
 
           options = {close_others: true}.merge(opts.fetch(:exec_opts, {}))
           if opts[:retain_fds]
             retained_fds.each { |fd| options[fd] = fd }
+          end
+          if opts[:cwd]
+            # We use the chdir option to `exec` since wrapping the
+            # `exec` in a Dir.chdir block caused these sporadic errors on macOS:
+            # Too many open files - getcwd (Errno::EMFILE)
+            options[:chdir] = opts[:cwd]
           end
 
           begin
