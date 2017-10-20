@@ -386,8 +386,7 @@ module Subprocess
 
       @stdin.close if (input.nil? || input.empty?) && !@stdin.nil?
 
-      self_read, self_write = IO.pipe
-      self.class.catching_sigchld(pid, self_write) do
+      self.class.catching_sigchld(pid) do |self_read|
         wait_r = [@stdout, @stderr, self_read].compact
         wait_w = [input && @stdin].compact
         loop do
@@ -548,11 +547,15 @@ module Subprocess
       end
     end
 
-    def self.catching_sigchld(pid, fd)
-      register_pid(pid, fd)
-      yield
-    ensure
-      unregister_pid(pid)
+    def self.catching_sigchld(pid)
+      IO.pipe do |self_read, self_write|
+        begin
+          register_pid(pid, self_write)
+          yield self_read
+        ensure
+          unregister_pid(pid)
+        end
+      end
     end
   end
 end
