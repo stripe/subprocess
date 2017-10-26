@@ -293,6 +293,34 @@ describe Subprocess do
       end
     end
 
+    it 'should not timeout in communicate if the command completes in time' do
+      Subprocess.check_call(['echo', 'foo'], stdout: Subprocess::PIPE) do |p|
+        stdout, _, = p.communicate(nil, 1)
+        stdout.must_equal("foo\n")
+      end
+    end
+
+    it 'should timeout in communicate without losing data' do
+      script = <<EOF
+echo foo
+sleep 10 &
+trap "echo bar; kill $!; exit" HUP
+wait
+EOF
+      Subprocess.check_call(['bash', '-c', script], stdout: Subprocess::PIPE) do |p|
+        # Read the first echo and timeout
+        e = lambda {
+          p.communicate(nil, 0.2)
+        }.must_raise(Subprocess::CommunicateTimeout)
+        e.stdout.must_equal("foo\n")
+
+        # Send a signal and read the next echo
+        p.send_signal('HUP')
+        stdout, _ = p.communicate
+        stdout.must_equal("bar\n")
+      end
+    end
+
     it 'has a license to kill' do
       start = Time.now
       lambda {
