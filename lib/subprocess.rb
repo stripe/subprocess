@@ -161,6 +161,22 @@ module Subprocess
     end
   end
 
+  # Error class representing a timeout during a call to `communicate`
+  class CommunicateTimeout < StandardError
+    # @!attribute [r] stdout
+    #   @return [String] Content read from stdout before the timeout
+    # @!attribute [r] stderr
+    #   @return [String] Content read from stderr before the timeout
+    attr_reader :stdout, :stderr
+
+    def initialize(cmd, stdout, stderr)
+      @stdout = stdout
+      @stderr = stderr
+
+      super("Timeout communicating with `#{cmd.join(' ')}`")
+    end
+  end
+
   # A child process. The preferred way of spawning a subprocess is through the
   # functions on {Subprocess} (especially {Subprocess::check_call} and
   # {Subprocess::check_output}).
@@ -373,9 +389,11 @@ module Subprocess
     # `:stderr` to {Subprocess::PIPE}.
     #
     # @param [String] input A string to feed to the child's standard input.
+    # @param [Numeric] timeout_s Raise {Subprocess::CommunicateTimeout} if communicate
+    #   does not finish after timeout_s seconds.
     # @return [Array<String>] An array of two elements: the data read from the
     #   child's standard output and standard error, respectively.
-    def communicate(input=nil)
+    def communicate(input=nil, timeout_s=nil)
       raise ArgumentError if !input.nil? && @stdin.nil?
 
       stdout, stderr = "", ""
@@ -386,6 +404,8 @@ module Subprocess
 
       @stdin.close if (input.nil? || input.empty?) && !@stdin.nil?
 
+      timeout_at = Time.now + timeout_s if timeout_s
+
       self_read, self_write = IO.pipe
       self.class.catching_sigchld(pid, self_write) do
         wait_r = [@stdout, @stderr, self_read].compact
@@ -395,7 +415,8 @@ module Subprocess
           # other than the self pipe, then we're done.
           break if poll && wait_r == [self_read]
 
-          ready_r, ready_w = select(wait_r, wait_w)
+          ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
+          raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
 
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
@@ -500,6 +521,18 @@ module Subprocess
       else
         false
       end
+    end
+
+    # Call IO.select timing out at Time `timeout_at`. If `timeout_at` is nil, never times out.
+    def select_until(read_array, write_array, err_array, timeout_at)
+      if !timeout_at
+        return IO.select(read_array, write_array, err_array)
+      end
+
+      remaining = (timeout_at - Time.now)
+      return nil if remaining <= 0
+
+      IO.select(read_array, write_array, err_array, remaining)
     end
 
     @sigchld_mutex = Mutex.new
