@@ -332,13 +332,13 @@ EOF
     end
 
     it 'sends other signals too' do
-      start = Time.now
-      Subprocess.check_call(['sleep', '1']) do |p|
+      Subprocess.check_call(['bash', '-c', 'read var'],
+                            stdin: Subprocess::PIPE) do |p|
         p.send_signal("STOP")
-        sleep 1
+        Process.waitpid(p.pid, Process::WUNTRACED).must_equal(p.pid)
         p.send_signal("CONT")
+        p.stdin.write("foo\n")
       end
-      (Time.now - start).must_be_close_to(2.0, 0.2)
     end
 
     it "doesn't leak children when throwing errors" do
