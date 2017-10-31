@@ -538,26 +538,46 @@ module Subprocess
     @sigchld_fds = {}
     @sigchld_old_handler = nil
 
-    # Wake up everyone. We can't tell who we should wake up without `wait`ing,
-    # and we want to let the process itself do that. In practice, we're not
-    # likely to have that many in-flight subprocesses, so this is probably not a
-    # big deal.
+    @sigchld_queue = nil
+
+    # Signal handlers run on the main thread but can interleave with
+    # other threads of execution, so we need to be extremely paranoid
+    # here. Namely, we check for nil and we catch a
+    # `ClosedQueueError`, since we can't be sure we won't get
+    # scheduled at some random moment when the queue is empty or
+    # nonexistent.
     def self.handle_sigchld
-      @sigchld_fds.values.each do |fd|
+      q = @sigchld_queue
+      if q
         begin
-          fd.write_nonblock("\x00")
-        rescue Errno::EWOULDBLOCK, Errno::EAGAIN, Errno::EPIPE
-          # If the pipe is full, the other end will be woken up
-          # regardless when it next reads, so it's fine to skip the
-          # write (the pipe is a wakeup channel, and doesn't contain
-          # meaningful data).
-          #
-          # We've seen EPIPE happen in production and don't fully
-          # understand it as of this writing, but if the other end has
-          # gone away, then there's no need to notify it and we'll
-          # just eat the error and move on. Plausibly we should remove
-          # the fd from `@sigchld_fds`, but since we don't have the
-          # lock I'm wary of trying to edit it.
+          q << :sigchld
+        rescue ClosedQueueError
+          nil
+        end
+      end
+    end
+
+    def self.sigchld_thread(queue)
+      loop do
+        # pop returns nil on a closed queue
+        return if queue.pop.nil?
+
+        @sigchld_mutex.synchronize do
+          # Wake up everyone. We can't tell who we should wake up
+          # without `wait`ing, and we want to let the process itself
+          # do that. In practice, we're not likely to have that many
+          # in-flight subprocesses, so this is probably not a big
+          # deal.
+          @sigchld_fds.values.each do |fd|
+            begin
+              fd.write_nonblock("\x00")
+            rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+              # If the pipe is full, the other end will be woken up
+              # regardless when it next reads, so it's fine to skip the
+              # write (the pipe is a wakeup channel, and doesn't contain
+              # meaningful data).
+            end
+          end
         end
       end
     end
@@ -566,6 +586,9 @@ module Subprocess
       @sigchld_mutex.synchronize do
         @sigchld_fds[pid] = fd
         if @sigchld_fds.length == 1
+          queue = Queue.new
+          @sigchld_queue = queue
+          Thread.new {sigchld_thread(queue)}
           @sigchld_old_handler = Signal.trap('SIGCHLD') {handle_sigchld}
         end
       end
@@ -575,6 +598,8 @@ module Subprocess
       @sigchld_mutex.synchronize do
         if @sigchld_fds.length == 1
           Signal.trap('SIGCHLD', @sigchld_old_handler || 'DEFAULT')
+          @sigchld_queue.close
+          @sigchld_queue = nil
         end
         @sigchld_fds.delete(pid)
       end
