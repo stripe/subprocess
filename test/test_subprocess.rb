@@ -15,6 +15,23 @@ require 'tempfile'
 # work on Windows.
 
 describe Subprocess do
+
+  def call_multiwrite_script(&block)
+    script = <<EOF
+sleep 10 &
+trap "echo bar; kill $!; exit" HUP
+echo foo 1>&2
+wait
+EOF
+
+    Subprocess.check_call(
+      ['bash', '-c', script],
+      stdout: Subprocess::PIPE, stderr: Subprocess::PIPE,
+      &block
+    )
+  end
+
+
   describe '.popen' do
     it 'creates Process objects' do
       p = Subprocess.popen(['true'])
@@ -301,23 +318,48 @@ describe Subprocess do
     end
 
     it 'should timeout in communicate without losing data' do
-      script = <<EOF
-echo foo
-sleep 10 &
-trap "echo bar; kill $!; exit" HUP
-wait
-EOF
-      Subprocess.check_call(['bash', '-c', script], stdout: Subprocess::PIPE) do |p|
+      call_multiwrite_script do |p|
         # Read the first echo and timeout
         e = lambda {
           p.communicate(nil, 0.2)
         }.must_raise(Subprocess::CommunicateTimeout)
-        e.stdout.must_equal("foo\n")
+        e.stderr.must_equal("foo\n")
+        e.stdout.must_equal("")
 
         # Send a signal and read the next echo
         p.send_signal('HUP')
-        stdout, _ = p.communicate
+        stdout, stderr = p.communicate
         stdout.must_equal("bar\n")
+        stderr.must_equal("")
+      end
+    end
+
+    it 'incrementally yields output to a block in communicate' do
+      call_multiwrite_script do |p|
+        called = 0
+
+        res = p.communicate(nil, 5) do |stdout, stderr|
+          case called
+          when 0
+            stderr.must_equal("foo\n")
+            stdout.must_equal("")
+            p.send_signal("HUP")
+          when 1
+            stderr.must_equal("")
+            stdout.must_equal("bar\n")
+          when 2, 3
+            # It's possible to loop one more time for each pipe depending on when exactly
+            # the process exits.
+            stderr.must_equal("")
+            stdout.must_equal("")
+          else
+            raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
+          end
+
+          called += 1
+        end
+
+        res.must_be_nil
       end
     end
 

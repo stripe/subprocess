@@ -391,8 +391,12 @@ module Subprocess
     # @param [String] input A string to feed to the child's standard input.
     # @param [Numeric] timeout_s Raise {Subprocess::CommunicateTimeout} if communicate
     #   does not finish after timeout_s seconds.
-    # @return [Array<String>] An array of two elements: the data read from the
+    # @yield [Array<String>] Called whenever data is read from stdout or stderr.
+    #   Arguments are an array of two elements: the data read from the
+    #   child's standard output and standard error since the last call, respectively.
+    # @return [Array<String>, nil] An array of two elements: the data read from the
     #   child's standard output and standard error, respectively.
+    #   Returns nil if a block is provided.
     def communicate(input=nil, timeout_s=nil)
       raise ArgumentError if !input.nil? && @stdin.nil?
 
@@ -417,16 +421,19 @@ module Subprocess
           ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
           raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
 
+          read_output = false
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
               wait_r.delete(@stdout)
             end
+            read_output = true
           end
 
           if ready_r.include?(@stderr)
             if drain_fd(@stderr, stderr)
               wait_r.delete(@stderr)
             end
+            read_output = true
           end
 
           if ready_r.include?(self_read)
@@ -461,6 +468,11 @@ module Subprocess
               wait_w.delete(@stdin)
             end
           end
+
+          if read_output && block_given?
+            yield stdout, stderr
+            stdout, stderr = "", ""
+          end
         end
       end
 
@@ -469,7 +481,11 @@ module Subprocess
       stdout.force_encoding(stdout_encoding) if stdout_encoding
       stderr.force_encoding(stderr_encoding) if stderr_encoding
 
-      [stdout, stderr]
+      if block_given?
+        nil
+      else
+        [stdout, stderr]
+      end
     end
 
     # Does exactly what it says on the box.
