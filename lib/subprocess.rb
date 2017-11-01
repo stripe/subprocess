@@ -543,21 +543,22 @@ module Subprocess
     # likely to have that many in-flight subprocesses, so this is probably not a
     # big deal.
     def self.handle_sigchld
-      @sigchld_fds.values.each do |fd|
-        begin
-          fd.write_nonblock("\x00")
-        rescue Errno::EWOULDBLOCK, Errno::EAGAIN, Errno::EPIPE
-          # If the pipe is full, the other end will be woken up
-          # regardless when it next reads, so it's fine to skip the
-          # write (the pipe is a wakeup channel, and doesn't contain
-          # meaningful data).
-          #
-          # We've seen EPIPE happen in production and don't fully
-          # understand it as of this writing, but if the other end has
-          # gone away, then there's no need to notify it and we'll
-          # just eat the error and move on. Plausibly we should remove
-          # the fd from `@sigchld_fds`, but since we don't have the
-          # lock I'm wary of trying to edit it.
+      # Do the wakeups inside a thread so that we can safely grab
+      # `sigchld_mutex`. Ruby signal handlers are not executed
+      # atomically with respect to other Ruby threads, so we need to
+      # properly synchronize.
+      Thread.new do
+        @sigchld_mutex.synchronize do
+          @sigchld_fds.values.each do |fd|
+            begin
+              fd.write_nonblock("\x00")
+            rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+              # If the pipe is full, the other end will be woken up
+              # regardless when it next reads, so it's fine to skip the
+              # write (the pipe is a wakeup channel, and doesn't contain
+              # meaningful data).
+            end
+          end
         end
       end
     end
