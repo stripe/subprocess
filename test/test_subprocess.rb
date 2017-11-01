@@ -347,11 +347,6 @@ EOF
           when 1
             stderr.must_equal("")
             stdout.must_equal("bar\n")
-          when 2, 3
-            # It's possible to loop one more time for each pipe depending on when exactly
-            # the process exits.
-            stderr.must_equal("")
-            stdout.must_equal("")
           else
             raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
           end

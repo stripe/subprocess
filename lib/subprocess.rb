@@ -422,19 +422,16 @@ module Subprocess
           ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
           raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
 
-          read_output = false
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
               wait_r.delete(@stdout)
             end
-            read_output = true
           end
 
           if ready_r.include?(@stderr)
             if drain_fd(@stderr, stderr)
               wait_r.delete(@stderr)
             end
-            read_output = true
           end
 
           if ready_r.include?(self_read)
@@ -470,7 +467,7 @@ module Subprocess
             end
           end
 
-          if read_output && block_given?
+          if block_given? && !(stderr.empty? && stdout.empty?)
             yield stdout, stderr
             stdout, stderr = "", ""
           end
