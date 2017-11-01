@@ -463,6 +463,8 @@ module Subprocess
           end
         end
       end
+      self_read.close
+      self_write.close
 
       wait
 
