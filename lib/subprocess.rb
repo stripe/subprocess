@@ -411,8 +411,7 @@ module Subprocess
 
       timeout_at = Time.now + timeout_s if timeout_s
 
-      self.class.catching_sigchld(pid) do |self_read|
-        global_read = self.class.sigchld_global_read
+      self.class.catching_sigchld(pid) do |global_read, self_read|
         wait_r = [@stdout, @stderr, self_read, global_read].compact
         wait_w = [input && @stdin].compact
         loop do
@@ -436,7 +435,9 @@ module Subprocess
           end
 
           if ready_r.include?(global_read)
-            drain_fd(global_read)
+            if drain_fd(global_read)
+              raise "Unexpected internal error -- someone closed the global self-pipe!"
+            end
             self.class.wakeup_sigchld
           end
 
@@ -560,10 +561,6 @@ module Subprocess
     @sigchld_global_write = nil
     @sigchld_global_read = nil
 
-    def self.sigchld_global_read
-      @sigchld_global_read
-    end
-
     def self.handle_sigchld
       # We'd like to just notify everything in `@sigchld_fds`, but
       # ruby signal handlers are not executed atomically with respect
@@ -626,7 +623,7 @@ module Subprocess
       IO.pipe do |self_read, self_write|
         begin
           register_pid(pid, self_write)
-          yield self_read
+          yield @sigchld_global_read, self_read
         ensure
           unregister_pid(pid)
         end
