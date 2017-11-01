@@ -30,7 +30,7 @@ module Subprocess
   #
   # @return [::Process::Status] The exit status of the process
   #
-  # @see {Process#initialize}
+  # @see Process#initialize
   def self.call(cmd, opts={}, &blk)
     Process.new(cmd, opts, &blk).wait
   end
@@ -62,7 +62,7 @@ module Subprocess
   #   was terminated with an error or was killed by a signal)
   # @return [::Process::Status] The exit status of the process
   #
-  # @see {Process#initialize}
+  # @see Process#initialize
   def self.check_call(cmd, opts={}, &blk)
     status = Process.new(cmd, opts, &blk).wait
     raise NonZeroExit.new(cmd, status) unless status.success?
@@ -79,7 +79,7 @@ module Subprocess
   #   was terminated with an error or was killed by a signal)
   # @return [String] The contents of `stdout`
   #
-  # @see {Process#initialize}
+  # @see Process#initialize
   def self.check_output(cmd, opts={}, &blk)
     opts[:stdout] = PIPE
     child = Process.new(cmd, opts, &blk)
@@ -381,9 +381,11 @@ module Subprocess
       false
     end
 
-    # Write the (optional) input to the process's `stdin`. Also, read (and
-    # buffer in memory) the contents of `stdout` and `stderr`. Do this all using
-    # `IO::select`, so we don't deadlock due to full pipe buffers.
+    # Write the (optional) input to the process's `stdin` and read the contents of
+    # `stdout` and `stderr`. If a block is provided, stdout and stderr are yielded as they
+    # are read. Otherwise they are buffered in memory and returned when the process
+    # exits. Do this all using `IO::select`, so we don't deadlock due to full pipe
+    # buffers.
     #
     # This is only really useful if you set some of `:stdin`, `:stdout`, and
     # `:stderr` to {Subprocess::PIPE}.
@@ -391,8 +393,11 @@ module Subprocess
     # @param [String] input A string to feed to the child's standard input.
     # @param [Numeric] timeout_s Raise {Subprocess::CommunicateTimeout} if communicate
     #   does not finish after timeout_s seconds.
-    # @return [Array<String>] An array of two elements: the data read from the
+    # @yieldparam [String] stdout Data read from stdout since the last yield
+    # @yieldparam [String] stderr Data read from stderr since the last yield
+    # @return [Array(String, String), nil] An array of two elements: the data read from the
     #   child's standard output and standard error, respectively.
+    #   Returns nil if a block is provided.
     def communicate(input=nil, timeout_s=nil)
       raise ArgumentError if !input.nil? && @stdin.nil?
 
@@ -461,6 +466,11 @@ module Subprocess
               wait_w.delete(@stdin)
             end
           end
+
+          if block_given? && !(stderr.empty? && stdout.empty?)
+            yield stdout, stderr
+            stdout, stderr = "", ""
+          end
         end
       end
 
@@ -469,7 +479,11 @@ module Subprocess
       stdout.force_encoding(stdout_encoding) if stdout_encoding
       stderr.force_encoding(stderr_encoding) if stderr_encoding
 
-      [stdout, stderr]
+      if block_given?
+        nil
+      else
+        [stdout, stderr]
+      end
     end
 
     # Does exactly what it says on the box.
