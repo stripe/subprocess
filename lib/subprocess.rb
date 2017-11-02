@@ -411,13 +411,13 @@ module Subprocess
 
       timeout_at = Time.now + timeout_s if timeout_s
 
-      self.class.catching_sigchld(pid) do |self_read|
-        wait_r = [@stdout, @stderr, self_read].compact
+      self.class.catching_sigchld(pid) do |global_read, self_read|
+        wait_r = [@stdout, @stderr, self_read, global_read].compact
         wait_w = [input && @stdin].compact
         loop do
           # If the process has exited and we're not waiting to read anything
           # other than the self pipe, then we're done.
-          break if poll && wait_r == [self_read]
+          break if poll && wait_r == [self_read, global_read]
 
           ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
           raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
@@ -432,6 +432,13 @@ module Subprocess
             if drain_fd(@stderr, stderr)
               wait_r.delete(@stderr)
             end
+          end
+
+          if ready_r.include?(global_read)
+            if drain_fd(global_read)
+              raise "Unexpected internal error -- someone closed the global self-pipe!"
+            end
+            self.class.wakeup_sigchld
           end
 
           if ready_r.include?(self_read)
@@ -551,27 +558,41 @@ module Subprocess
     @sigchld_mutex = Mutex.new
     @sigchld_fds = {}
     @sigchld_old_handler = nil
+    @sigchld_global_write = nil
+    @sigchld_global_read = nil
+
+    def self.handle_sigchld
+      # We'd like to just notify everything in `@sigchld_fds`, but
+      # ruby signal handlers are not executed atomically with respect
+      # to other Ruby threads, so reading it is racy. We can't grab
+      # `@sigchld_mutex`, because signal execution blocks the main
+      # thread, and so we'd deadlock if the main thread currently
+      # holds it.
+      #
+      # Instead, we keep a long-lived notify self-pipe that we select
+      # on inside `communicate`, and we task `communicate` with
+      # grabbing the lock and fanning out the wakeups.
+      begin
+        @sigchld_global_write.write_nonblock("\x00")
+      rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+        nil # ignore
+      end
+    end
 
     # Wake up everyone. We can't tell who we should wake up without `wait`ing,
     # and we want to let the process itself do that. In practice, we're not
     # likely to have that many in-flight subprocesses, so this is probably not a
     # big deal.
-    def self.handle_sigchld
-      # Do the wakeups inside a thread so that we can safely grab
-      # `sigchld_mutex`. Ruby signal handlers are not executed
-      # atomically with respect to other Ruby threads, so we need to
-      # properly synchronize.
-      Thread.new do
-        @sigchld_mutex.synchronize do
-          @sigchld_fds.values.each do |fd|
-            begin
-              fd.write_nonblock("\x00")
-            rescue Errno::EWOULDBLOCK, Errno::EAGAIN
-              # If the pipe is full, the other end will be woken up
-              # regardless when it next reads, so it's fine to skip the
-              # write (the pipe is a wakeup channel, and doesn't contain
-              # meaningful data).
-            end
+    def self.wakeup_sigchld
+      @sigchld_mutex.synchronize do
+        @sigchld_fds.values.each do |fd|
+          begin
+            fd.write_nonblock("\x00")
+          rescue Errno::EWOULDBLOCK, Errno::EAGAIN
+            # If the pipe is full, the other end will be woken up
+            # regardless when it next reads, so it's fine to skip the
+            # write (the pipe is a wakeup channel, and doesn't contain
+            # meaningful data).
           end
         end
       end
@@ -581,6 +602,9 @@ module Subprocess
       @sigchld_mutex.synchronize do
         @sigchld_fds[pid] = fd
         if @sigchld_fds.length == 1
+          if @sigchld_global_write.nil?
+            @sigchld_global_read, @sigchld_global_write = IO.pipe
+          end
           @sigchld_old_handler = Signal.trap('SIGCHLD') {handle_sigchld}
         end
       end
@@ -599,7 +623,7 @@ module Subprocess
       IO.pipe do |self_read, self_write|
         begin
           register_pid(pid, self_write)
-          yield self_read
+          yield @sigchld_global_read, self_read
         ensure
           unregister_pid(pid)
         end
