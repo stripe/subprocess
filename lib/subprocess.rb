@@ -561,7 +561,7 @@ module Subprocess
       # `sigchld_mutex`. Ruby signal handlers are not executed
       # atomically with respect to other Ruby threads, so we need to
       # properly synchronize.
-      Thread.new do
+      th = Thread.new do
         @sigchld_mutex.synchronize do
           @sigchld_fds.values.each do |fd|
             begin
@@ -575,6 +575,7 @@ module Subprocess
           end
         end
       end
+      th.name = 'subprocess:handle_sigchld'
     end
 
     def self.register_pid(pid, fd)
