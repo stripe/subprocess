@@ -585,6 +585,7 @@ module Subprocess
     # big deal.
     def self.wakeup_sigchld
       @sigchld_mutex.synchronize do
+        $stderr.puts("got global_read, waking #{@sigchld_fds.length} listeners...")
         @sigchld_fds.values.each do |fd|
           begin
             fd.write_nonblock("\x00")
