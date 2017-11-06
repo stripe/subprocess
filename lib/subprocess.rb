@@ -604,6 +604,10 @@ module Subprocess
         @sigchld_fds[pid] = fd
         if @sigchld_fds.length == 1
           if @sigchld_global_write.nil? || @sigchld_pipe_pid != ::Process.pid
+            # Check the PID so that if we fork we will re-open the
+            # pipe. It's important that a fork parent and child don't
+            # share this pipe, because if they do they risk stealing
+            # each others' wakeups.
             @sigchld_pipe_pid = ::Process.pid
             @sigchld_global_read, @sigchld_global_write = IO.pipe
           end
