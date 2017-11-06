@@ -560,6 +560,7 @@ module Subprocess
     @sigchld_old_handler = nil
     @sigchld_global_write = nil
     @sigchld_global_read = nil
+    @sigchld_pipe_pid = nil
 
     def self.handle_sigchld
       # We'd like to just notify everything in `@sigchld_fds`, but
@@ -602,7 +603,8 @@ module Subprocess
       @sigchld_mutex.synchronize do
         @sigchld_fds[pid] = fd
         if @sigchld_fds.length == 1
-          if @sigchld_global_write.nil?
+          if @sigchld_global_write.nil? || @sigchld_pipe_pid != ::Process.pid
+            @sigchld_pipe_pid = ::Process.pid
             @sigchld_global_read, @sigchld_global_write = IO.pipe
           end
           @sigchld_old_handler = Signal.trap('SIGCHLD') {handle_sigchld}
