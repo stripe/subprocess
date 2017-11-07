@@ -294,6 +294,16 @@ EOF
       end
     end
 
+    it 'does not deadlock when communicating with a process that forks' do
+      script = <<EOF
+  echo "fork"
+  (echo "me" && sleep 10) &
+EOF
+      p = Subprocess::Process.new(['bash', '-c', script], stdout: Subprocess::PIPE)
+      stdout, _stderr = p.communicate(nil, 5)
+      stdout.must_include("fork\n")
+    end
+
     it 'should not raise an error when the process closes stdin before we finish writing' do
       script = File.join(File.dirname(__FILE__), 'bin', 'closer.rb')
       Subprocess.check_call(['bash', '-c', '<&-; echo -n "foo"; sleep 1'], :stdin => Subprocess::PIPE,
