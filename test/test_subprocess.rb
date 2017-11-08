@@ -31,6 +31,8 @@ EOF
     )
   end
 
+  # A string larger than the pipe buffer. We ensure this is true in a test below.
+  MULTI_WRITE_STRING = "x" * 1024 * 1024
 
   describe '.popen' do
     it 'creates Process objects' do
@@ -61,19 +63,16 @@ EOF
       Subprocess.call(['true']).must_be_instance_of(Process::Status)
     end
 
-    it 'waits for the process to exit' do
+    it 'yields before and returns after the process exits' do
       start = Time.now
-      Subprocess.call(['sleep', '1'])
-      # The point of this isn't to test /bin/sleep: we're okay with anything
-      # that's much closer to 1 than it is to 0.
-      (Time.now - start).must_be_close_to(1.0, 0.2)
-    end
-
-    it 'yields before the process exits' do
-      start = Time.now
-      Subprocess.call(['sleep', '1']) do |p|
+      sleep_time = 0.5
+      Subprocess.call(['sleep', sleep_time.to_s]) do |p|
         (Time.now - start).must_be_close_to(0.0, 0.2)
       end
+
+      # The point of this isn't to test /bin/sleep: we're okay with anything
+      # that's much closer to sleep_time than zero.
+      (Time.now - start).must_be_close_to(sleep_time, 0.2)
     end
 
     it 'returns a successful status when calling true' do
@@ -271,18 +270,26 @@ EOF
       p = Subprocess::Process.new(['sleep', '1'])
       p.poll
       (Time.now - start).must_be_close_to(0.0, 0.2)
+      p.terminate
       p.wait
     end
 
     it 'should not deadlock when #communicate-ing with large strings' do
+      # First ensure that this string really is bigger than the pipe buffer
+      # on this system.
+      IO.pipe do |_r, w|
+        begin
+          written = w.write_nonblock(MULTI_WRITE_STRING)
+        rescue IO::WaitWritable, Errno::EINTR
+          retry
+        end
+        written.must_be :<, MULTI_WRITE_STRING.length
+      end
+
       Subprocess.check_call(['cat'], :stdin => Subprocess::PIPE,
                             :stdout => Subprocess::PIPE) do |p|
-        # Generate a 16MB string, which happens to be quite a bit bigger than
-        # the pipe buffers on all systems I know about. A naive solution here
-        # would deadlock pretty quickly.
-        string = "x" * 1024 * 1024 * 16
-        stdout, stderr = p.communicate(string)
-        stdout.must_equal(string)
+        stdout, _stderr = p.communicate(MULTI_WRITE_STRING)
+        stdout.must_equal(MULTI_WRITE_STRING)
       end
     end
 
@@ -295,18 +302,28 @@ EOF
     end
 
     it 'should not raise an error when the process closes stdin before we finish writing' do
-      script = File.join(File.dirname(__FILE__), 'bin', 'closer.rb')
-      Subprocess.check_call(['bash', '-c', '<&-; echo -n "foo"; sleep 1'], :stdin => Subprocess::PIPE,
+      script = <<EOF
+<&-
+sleep 10 &
+trap "kill $!; exit" HUP
+echo -n foo
+wait
+EOF
+      Subprocess.check_call(['bash', '-c', script], :stdin => Subprocess::PIPE,
                             :stdout => Subprocess::PIPE) do |p|
         # Wait for the read on stdout to be available before we force a read to stdin
         IO.select([p.stdout])
 
-        # Generate a 16MB string, which happens to be quite a bit bigger than
-        # the pipe buffers on all systems I know about. A naive solution here
-        # would deadlock pretty quickly.
-        string = "x" * 1024 * 1024 * 16
-        stdout, stderr = p.communicate(string)
-        stdout.must_equal("foo")
+        yielded = false
+        p.communicate(MULTI_WRITE_STRING) do |stdout, _stderr|
+          if yielded
+            stdout.must_equal("")
+          else
+            stdout.must_equal("foo")
+            p.send_signal("HUP")
+            yielded = true
+          end
+        end
       end
     end
 
