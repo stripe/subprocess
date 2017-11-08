@@ -361,6 +361,11 @@ module Subprocess
       @status ||= ::Process.waitpid2(@pid).last
     end
 
+    # An alias for {Process.drain_fd}
+    def drain_fd(fd, buf=nil)
+      self.class.drain_fd(fd, buf)
+    end
+
     # Do nonblocking reads from `fd`, appending all data read into `buf`.
     #
     # @param [IO] fd The file to read from.
@@ -368,7 +373,7 @@ module Subprocess
     #
     # @return [true, false] Whether `fd` was closed due to an exceptional
     #   condition (`EOFError` or `EPIPE`).
-    def drain_fd(fd, buf=nil)
+    def self.drain_fd(fd, buf=nil)
       loop do
         tmp = fd.read_nonblock(4096)
         buf << tmp unless buf.nil?
@@ -395,6 +400,8 @@ module Subprocess
     #   does not finish after timeout_s seconds.
     # @yieldparam [String] stdout Data read from stdout since the last yield
     # @yieldparam [String] stderr Data read from stderr since the last yield
+    # @yieldparam [::Process::Status, nil] status The exit status of the process from before
+    #   the last read to stdout/stderr.
     # @return [Array(String, String), nil] An array of two elements: the data read from the
     #   child's standard output and standard error, respectively.
     #   Returns nil if a block is provided.
@@ -421,6 +428,11 @@ module Subprocess
 
           ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
           raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
+
+          # Poll status before draining stdout/stderr so that the @status value
+          # we yield to the block can be used to determine if we've fully drained
+          # stdio from the process.
+          poll
 
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
@@ -474,8 +486,11 @@ module Subprocess
             end
           end
 
-          if block_given? && !(stderr.empty? && stdout.empty?)
-            yield stdout, stderr
+          # We yield even if there is nothing to read on stdout/stderr so that the block
+          # can detect when the process exits even if stdout/sterr would otherwise remain
+          # open in another process and prevent `communicate` from terminating.
+          if block_given? && !(ready_r.empty? || ready_r == [global_read])
+            yield stdout, stderr, @status
             stdout, stderr = "", ""
           end
         end
@@ -620,6 +635,13 @@ module Subprocess
       @sigchld_mutex.synchronize do
         if @sigchld_fds.length == 1
           Signal.trap('SIGCHLD', @sigchld_old_handler || 'DEFAULT')
+
+          # Drain any unread messages since nothing else is listening for them. This
+          # helps isolate tests since a pending message on the global pipe
+          # from one test can't change the number of `communicate` iterations in another.
+          if drain_fd(@sigchld_global_read)
+            raise "Unexpected internal error -- someone closed the global self-pipe!"
+          end
         end
         @sigchld_fds.delete(pid)
       end
