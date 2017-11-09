@@ -414,13 +414,17 @@ module Subprocess
       self.class.catching_sigchld(pid) do |global_read, self_read|
         wait_r = [@stdout, @stderr, self_read, global_read].compact
         wait_w = [input && @stdin].compact
-        loop do
-          # If the process has exited and we're not waiting to read anything
-          # other than the self pipe, then we're done.
-          break if poll && wait_r == [self_read, global_read]
-
-          ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
-          raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
+        done = false
+        while !done
+          # If the process has exited, we want to drain any remaining output before returning
+          if poll
+            ready_r = wait_r - [self_read, global_read]
+            ready_w = []
+            done = true
+          else
+            ready_r, ready_w = select_until(wait_r, wait_w, [], timeout_at)
+            raise CommunicateTimeout.new(@command, stdout, stderr) if ready_r.nil?
+          end
 
           if ready_r.include?(@stdout)
             if drain_fd(@stdout, stdout)
