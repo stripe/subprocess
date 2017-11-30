@@ -374,6 +374,9 @@ EOF
           when 1
             stderr.must_equal("")
             stdout.must_equal("bar\n")
+          when 2, 3, 4 # May loop separately for self_read, stdout and stderr
+            stderr.must_equal("")
+            stdout.must_equal("")
           else
             raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
           end
@@ -382,6 +385,33 @@ EOF
         end
 
         res.must_be_nil
+      end
+    end
+
+    it 'yields on exit even when a forked process holds open stdout/stderr' do
+      IO.pipe do |r, w|
+        called = 0
+        script = "(cat <&#{r.fileno}) &\nexit 22"
+
+        p = Subprocess::Process.new(
+          ['bash', '-c', script],
+          stdout: Subprocess::PIPE,
+          retain_fds: [r.fileno]
+        )
+        p.communicate(nil, 5) do |stdout, _stderr, status|
+          case called
+          when 0
+            stdout.must_equal("")
+            status.exitstatus.must_equal(22)
+            w.write("foo")
+            w.close
+          when 1
+            stdout.must_equal("foo")
+          else
+            raise "Unexpected #{called+1} call to `communicate`"
+          end
+          called += 1
+        end
       end
     end
 
