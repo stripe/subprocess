@@ -18,10 +18,10 @@ describe Subprocess do
 
   def call_multiwrite_script(&block)
     script = <<EOF
-sleep 10 &
-trap "echo bar; kill $!; exit" HUP
-echo foo 1>&2
-wait
+  sleep 10 &
+  trap "echo 你好; kill $!; exit" HUP
+  echo 世界 1>&2
+  wait
 EOF
 
     Subprocess.check_call(
@@ -350,13 +350,13 @@ EOF
         e = lambda {
           p.communicate(nil, 0.2)
         }.must_raise(Subprocess::CommunicateTimeout)
-        e.stderr.must_equal("foo\n")
+        e.stderr.must_equal("世界\n")
         e.stdout.must_equal("")
 
         # Send a signal and read the next echo
         p.send_signal('HUP')
         stdout, stderr = p.communicate
-        stdout.must_equal("bar\n")
+        stdout.must_equal("你好\n")
         stderr.must_equal("")
       end
     end
@@ -368,12 +368,12 @@ EOF
         res = p.communicate(nil, 5) do |stdout, stderr|
           case called
           when 0
-            stderr.must_equal("foo\n")
+            stderr.must_equal("世界\n")
             stdout.must_equal("")
             p.send_signal("HUP")
           when 1
             stderr.must_equal("")
-            stdout.must_equal("bar\n")
+            stdout.must_equal("你好\n")
           else
             raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
           end

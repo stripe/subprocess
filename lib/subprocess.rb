@@ -478,6 +478,9 @@ module Subprocess
             end
           end
 
+          stdout.force_encoding(stdout_encoding) if stdout_encoding
+          stderr.force_encoding(stderr_encoding) if stderr_encoding
+
           if block_given? && !(stderr.empty? && stdout.empty?)
             yield stdout, stderr
             stdout, stderr = "", ""
@@ -486,9 +489,6 @@ module Subprocess
       end
 
       wait
-
-      stdout.force_encoding(stdout_encoding) if stdout_encoding
-      stderr.force_encoding(stderr_encoding) if stderr_encoding
 
       if block_given?
         nil
