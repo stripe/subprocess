@@ -18,10 +18,10 @@ describe Subprocess do
 
   def call_multiwrite_script(&block)
     script = <<EOF
-  sleep 10 &
-  trap "echo 你好; kill $!; exit" HUP
-  echo 世界 1>&2
-  wait
+sleep 10 &
+trap "echo bar; kill $!; exit" HUP
+echo foo 1>&2
+wait
 EOF
 
     Subprocess.check_call(
@@ -350,13 +350,13 @@ EOF
         e = lambda {
           p.communicate(nil, 0.2)
         }.must_raise(Subprocess::CommunicateTimeout)
-        e.stderr.must_equal("世界\n")
+        e.stderr.must_equal("foo\n")
         e.stdout.must_equal("")
 
         # Send a signal and read the next echo
         p.send_signal('HUP')
         stdout, stderr = p.communicate
-        stdout.must_equal("你好\n")
+        stdout.must_equal("bar\n")
         stderr.must_equal("")
       end
     end
@@ -368,12 +368,12 @@ EOF
         res = p.communicate(nil, 5) do |stdout, stderr|
           case called
           when 0
-            stderr.must_equal("世界\n")
+            stderr.must_equal("foo\n")
             stdout.must_equal("")
             p.send_signal("HUP")
           when 1
             stderr.must_equal("")
-            stdout.must_equal("你好\n")
+            stdout.must_equal("bar\n")
           else
             raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
           end
@@ -421,10 +421,27 @@ EOF
       children.must_equal([])
     end
 
-    it "properly encodes output strings" do
-      test_string = 'aå'
-      output = Subprocess.check_output(['echo', '-n', test_string])
-      output.must_equal(test_string)
+    describe '#communicate' do
+      script = %Q(echo -n 你好; sleep 1; echo -n 世界) # Use `sleep` to cycle IO#select
+
+      it 'preserves encoding across IO selection cycles with no block given' do
+        process = Subprocess::Process.new(['bash', '-c', script], :stdout => Subprocess::PIPE)
+
+        stdout, _stderr =  process.communicate
+
+        stdout.must_equal("你好世界")
+      end
+
+      it 'preserves encoding  across IO selection cycles with a block given' do
+        process = Subprocess::Process.new(['bash', '-c', script], :stdout => Subprocess::PIPE)
+        stdout = ""
+
+        process.communicate do |out, _err|
+          stdout << out
+        end
+
+        stdout.must_equal("你好世界")
+      end
     end
   end
 end

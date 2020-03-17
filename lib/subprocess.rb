@@ -370,7 +370,7 @@ module Subprocess
     #   condition (`EOFError` or `EPIPE`).
     def drain_fd(fd, buf=nil)
       loop do
-        tmp = fd.read_nonblock(4096)
+        tmp = fd.read_nonblock(4096).force_encoding(fd.external_encoding)
         buf << tmp unless buf.nil?
       end
     rescue EOFError, Errno::EPIPE
@@ -402,8 +402,6 @@ module Subprocess
       raise ArgumentError if !input.nil? && @stdin.nil?
 
       stdout, stderr = "", ""
-      stdout_encoding = @stdout.external_encoding if @stdout
-      stderr_encoding = @stderr.external_encoding if @stderr
 
       input = input.dup unless input.nil?
 
@@ -477,9 +475,6 @@ module Subprocess
               wait_w.delete(@stdin)
             end
           end
-
-          stdout.force_encoding(stdout_encoding) if stdout_encoding
-          stderr.force_encoding(stderr_encoding) if stderr_encoding
 
           if block_given? && !(stderr.empty? && stdout.empty?)
             yield stdout, stderr
