@@ -548,7 +548,7 @@ module Subprocess
     # "mine" is only non-nil in the case of a pipe (in fact, we just return a
     # list of length one, since ruby will unpack nils from missing list items).
     #
-    # @param [IO, Integer, String, Subprocess::PIPE, nil] fd
+    # @param [IO, Integer, String, nil] fd
     # @param [String] mode
     # @return [Array<IO>]
     def parse_fd(fd, mode)
@@ -573,7 +573,7 @@ module Subprocess
     # The pair to parse_fd, returns whether or not the file descriptor was
     # opened by us (and therefore should be closed by us).
     #
-    # @param [IO, Integer, String, Subprocess::PIPE, nil] fd
+    # @param [IO, Integer, String, nil] fd
     # @return [Boolean]
     def our_fd?(fd)
       case fd
