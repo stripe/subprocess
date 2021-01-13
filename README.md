@@ -65,6 +65,31 @@ differences, but if we have missed something, please file an issue.
 [python]: http://docs.python.org/library/subprocess.html
 [rubydoc]: http://rubydoc.info/github/stripe/subprocess/Subprocess
 
+Maintenance
+-----------
+
+Steps to release a new version:
+
+```bash
+# Work directly on master
+git checkout master
+
+# -- edit version in lib/subprocess/version.rb --
+
+# Update RBI files
+bundle exec rake sord
+
+# Subsequent commands reference the version
+VERSION=1.5.4
+git commit -am "Bump version to $VERSION"
+git tag "v$VERSION"
+git push origin master --tags
+bundle exec rake publish
+```
+
+If you get errors, ask someone to add you to `bindings/rubygems-api-key` in
+Vault or ask someone who already has permissions. See <http://go/password-vault>
+
 Acknowledgements
 ----------------
 
