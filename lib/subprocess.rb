@@ -16,7 +16,13 @@ module Subprocess
 
   # An alias for `Process.new`. Mostly here to better emulate the Python API.
   #
+  # @param [Array<String>] cmd See {Process#initialize}
+  # @param [Hash] opts See {Process#initialize}
+  # @yield [process] See {Process#initialize}
+  # @yieldparam process [Process] See {Process#initialize}
   # @return [Process] A process with the given arguments
+  #
+  # @see Process#initialize
   def self.popen(cmd, opts={}, &blk)
     Process.new(cmd, opts, &blk)
   end
@@ -27,6 +33,11 @@ module Subprocess
   #   this function will block indefinitely as soon as the OS's pipe buffer
   #   fills up, as neither file descriptor will be read from. To avoid this, use
   #   {Process#communicate} from a passed block.
+  #
+  # @param [Array<String>] cmd See {Process#initialize}
+  # @param [Hash] opts See {Process#initialize}
+  # @yield [process] See {Process#initialize}
+  # @yieldparam process [Process] See {Process#initialize}
   #
   # @return [::Process::Status] The exit status of the process
   #
@@ -58,6 +69,11 @@ module Subprocess
   #   fills up, as neither file descriptor will be read from. To avoid this, use
   #   {Process#communicate} from a passed block.
   #
+  # @param [Array<String>] cmd See {Process#initialize}
+  # @param [Hash] opts See {Process#initialize}
+  # @yield [process] See {Process#initialize}
+  # @yieldparam process [Process] See {Process#initialize}
+  #
   # @raise [NonZeroExit] if the process returned a non-zero exit status (i.e.,
   #   was terminated with an error or was killed by a signal)
   # @return [::Process::Status] The exit status of the process
@@ -70,10 +86,15 @@ module Subprocess
   end
 
   # Like {Subprocess::check_call}, but return the contents of `stdout`, much
-  # like `Kernel#system`.
+  # like {::Kernel#system}.
   #
   # @example Get the system load
   #   system_load = Subprocess.check_output(['uptime']).split(' ').last(3)
+  #
+  # @param [Array<String>] cmd See {Process#initialize}
+  # @param [Hash] opts See {Process#initialize}
+  # @yield [process] See {Process#initialize}
+  # @yieldparam process [Process] See {Process#initialize}
   #
   # @raise [NonZeroExit] if the process returned a non-zero exit status (i.e.,
   #   was terminated with an error or was killed by a signal)
@@ -130,16 +151,17 @@ module Subprocess
 
   # Error class representing a process's abnormal exit.
   class NonZeroExit < StandardError
-    # @!attribute [r] command
-    #   @note This is intended only for use in user-facing error messages. In
-    #     particular, no shell quoting of any sort is performed when
-    #     constructing this string, meaning that blindly running it in a shell
-    #     might have different semantics than the original command.
-    #   @return [String] The command and arguments for the process that exited
-    #     abnormally.
-    # @!attribute [r] status
-    #   @return [::Process::Status] The Ruby status object returned by `waitpid`
-    attr_reader :command, :status
+    # @note This is intended only for use in user-facing error messages. In
+    #   particular, no shell quoting of any sort is performed when
+    #   constructing this string, meaning that blindly running it in a shell
+    #   might have different semantics than the original command.
+    #
+    # @return [String] The command and arguments for the process that exited
+    #   abnormally.
+    attr_reader :command
+
+    # @return [::Process::Status] The Ruby status object returned by `waitpid`
+    attr_reader :status
 
     # Return an instance of {NonZeroExit}.
     #
@@ -163,12 +185,15 @@ module Subprocess
 
   # Error class representing a timeout during a call to `communicate`
   class CommunicateTimeout < StandardError
-    # @!attribute [r] stdout
-    #   @return [String] Content read from stdout before the timeout
-    # @!attribute [r] stderr
-    #   @return [String] Content read from stderr before the timeout
-    attr_reader :stdout, :stderr
+    # @return [String] Content read from stdout before the timeout
+    attr_reader :stdout
 
+    # @return [String] Content read from stderr before the timeout
+    attr_reader :stderr
+
+    # @param [Array<String>] cmd
+    # @param [String] stdout
+    # @param [String] stderr
     def initialize(cmd, stdout, stderr)
       @stdout = stdout
       @stderr = stderr
@@ -181,22 +206,24 @@ module Subprocess
   # functions on {Subprocess} (especially {Subprocess::check_call} and
   # {Subprocess::check_output}).
   class Process
-    # @!attribute [r] stdin
-    #   @return [IO] The `IO` that is connected to this process's `stdin`.
-    # @!attribute [r] stdout
-    #   @return [IO] The `IO` that is connected to this process's `stdout`.
-    # @!attribute [r] stderr
-    #   @return [IO] The `IO` that is connected to this process's `stderr`.
-    attr_reader :stdin, :stdout, :stderr
+    # @return [IO] The `IO` that is connected to this process's `stdin`.
+    attr_reader :stdin
 
-    # @!attribute [r] command
-    #   @return [Array<String>] The command this process was invoked with.
-    # @!attribute [r] pid
-    #   @return [Fixnum] The process ID of the spawned process.
-    # @!attribute [r] status
-    #   @return [::Process::Status] The exit status code of the process. Only
-    #     set after the process has exited.
-    attr_reader :command, :pid, :status
+    # @return [IO] The `IO` that is connected to this process's `stdout`.
+    attr_reader :stdout
+
+    # @return [IO] The `IO` that is connected to this process's `stderr`.
+    attr_reader :stderr
+
+    # @return [Array<String>] The command this process was invoked with.
+    attr_reader :command
+
+    # @return [Integer] The process ID of the spawned process.
+    attr_reader :pid
+
+    # @return [::Process::Status] The exit status code of the process. Only
+    #   set after the process has exited.
+    attr_reader :status
 
     # Create a new process.
     #
@@ -204,15 +231,15 @@ module Subprocess
     #   style of an `argv` array). Unlike Python's subprocess module, `cmd`
     #   cannot be a String.
     #
-    # @option opts [IO, Fixnum, String, Subprocess::PIPE, nil] :stdin The `IO`,
+    # @option opts [IO, Integer, String, Subprocess::PIPE, nil] :stdin The `IO`,
     #   file descriptor number, or file name to use for the process's standard
     #   input. If the magic value {Subprocess::PIPE} is passed, a new pipe will
     #   be opened.
-    # @option opts [IO, Fixnum, String, Subprocess::PIPE, nil] :stdout The `IO`,
+    # @option opts [IO, Integer, String, Subprocess::PIPE, nil] :stdout The `IO`,
     #   file descriptor number, or file name to use for the process's standard
     #   output. If the magic value {Subprocess::PIPE} is passed, a pipe will be
     #   opened and attached to the process.
-    # @option opts [IO, Fixnum, String, Subprocess::PIPE, Subprocess::STDOUT,
+    # @option opts [IO, Integer, String, Subprocess::PIPE, Subprocess::STDOUT,
     #   nil] :stderr The `IO`, file descriptor number, or file name to use for
     #   the process's standard error. If the special value {Subprocess::PIPE} is
     #   passed, a pipe will be opened and attached to the process. If the
@@ -223,12 +250,12 @@ module Subprocess
     #   child process.
     # @option opts [Hash<String, String>] :env The environment to use in the
     #   child process.
-    # @option opts [Array<Fixnum>] :retain_fds An array of file descriptor
+    # @option opts [Array<Integer>] :retain_fds An array of file descriptor
     #   numbers that should not be closed before executing the child process.
     #   Note that, unlike Python (which has :close_fds defaulting to false), all
     #   file descriptors not specified here will be closed.
     # @option opts [Hash] :exec_opts A hash that will be merged into the options
-    #   hash of the call to {Kernel#exec}.
+    #   hash of the call to {::Kernel#exec}.
     #
     # @option opts [Proc] :preexec_fn A function that will be called in the
     #   child process immediately before executing `cmd`.
@@ -494,15 +521,23 @@ module Subprocess
 
     # Does exactly what it says on the box.
     #
-    # @param [String, Symbol, Fixnum] signal The signal to send to the child
+    # @param [String, Symbol, Integer] signal The signal to send to the child
     #   process. Accepts all the same arguments as Ruby's built-in
     #   {::Process::kill}, for instance a string like "INT" or "SIGINT", or a
     #   signal number like 2.
+    #
+    # @return [Integer] See {::Process.kill}
+    #
+    # @see ::Process.kill
     def send_signal(signal)
       ::Process.kill(signal, pid)
     end
 
     # Sends `SIGTERM` to the process.
+    #
+    # @return [Integer] See {send_signal}
+    #
+    # @see send_signal
     def terminate
       send_signal("TERM")
     end
@@ -512,6 +547,10 @@ module Subprocess
     # descriptor should appear to the child and to this process, respectively.
     # "mine" is only non-nil in the case of a pipe (in fact, we just return a
     # list of length one, since ruby will unpack nils from missing list items).
+    #
+    # @param [IO, Integer, String, Subprocess::PIPE, nil] fd
+    # @param [String] mode
+    # @return [Array<IO>]
     def parse_fd(fd, mode)
       fds = case fd
       when PIPE
@@ -533,6 +572,9 @@ module Subprocess
 
     # The pair to parse_fd, returns whether or not the file descriptor was
     # opened by us (and therefore should be closed by us).
+    #
+    # @param [IO, Integer, String, Subprocess::PIPE, nil] fd
+    # @return [Boolean]
     def our_fd?(fd)
       case fd
       when PIPE, String
@@ -543,6 +585,12 @@ module Subprocess
     end
 
     # Call IO.select timing out at Time `timeout_at`. If `timeout_at` is nil, never times out.
+    #
+    # @param [Array<IO>, nil] read_array
+    # @param [Array<IO>, nil] write_array
+    # @param [Array<IO>, nil] err_array
+    # @param [Integer, Float, nil] timeout_at
+    # @return [Array<Array<IO>>, nil]
     def select_until(read_array, write_array, err_array, timeout_at)
       if !timeout_at
         return IO.select(read_array, write_array, err_array)
@@ -561,6 +609,7 @@ module Subprocess
     @sigchld_global_read = nil
     @sigchld_pipe_pid = nil
 
+    # @return [void]
     def self.handle_sigchld
       # We'd like to just notify everything in `@sigchld_fds`, but
       # ruby signal handlers are not executed atomically with respect
@@ -583,6 +632,7 @@ module Subprocess
     # and we want to let the process itself do that. In practice, we're not
     # likely to have that many in-flight subprocesses, so this is probably not a
     # big deal.
+    # @return [void]
     def self.wakeup_sigchld
       @sigchld_mutex.synchronize do
         @sigchld_fds.values.each do |fd|
@@ -598,6 +648,9 @@ module Subprocess
       end
     end
 
+    # @param [Integer] pid
+    # @param [IO] fd
+    # @return [void]
     def self.register_pid(pid, fd)
       @sigchld_mutex.synchronize do
         @sigchld_fds[pid] = fd
@@ -615,6 +668,8 @@ module Subprocess
       end
     end
 
+    # @param [Integer] pid
+    # @return [void]
     def self.unregister_pid(pid)
       @sigchld_mutex.synchronize do
         if @sigchld_fds.length == 1
@@ -624,6 +679,8 @@ module Subprocess
       end
     end
 
+    # @param [Integer] pid
+    # @return [void]
     def self.catching_sigchld(pid)
       IO.pipe do |self_read, self_write|
         begin
