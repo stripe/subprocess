@@ -11,7 +11,7 @@
 module ::Subprocess
   PIPE = T.let(-1, T.untyped)
   STDOUT = T.let(-2, T.untyped)
-  VERSION = T.let('1.5.3', T.untyped)
+  VERSION = T.let('1.5.4', T.untyped)
 
   # An alias for `Process.new`. Mostly here to better emulate the Python API.
   #
