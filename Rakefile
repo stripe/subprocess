@@ -65,3 +65,12 @@ task :sord do
   end
   puts 'Done running substitutions on sord output'
 end
+
+task :publish do
+  require_relative 'lib/subprocess'
+  sh 'gem', 'build', 'subprocess.gemspec'
+  ENV['GEM_HOST_API_KEY'] = Subprocess.check_output(['fetch-password', '--quiet', '--raw', 'bindings/rubygems-api-key'])
+  gem_file = "subprocess-#{Subprocess::VERSION}.gem"
+  sh 'gem', 'push', gem_file
+  sh 'rm', '-f', gem_file
+end
