@@ -69,8 +69,11 @@ end
 task :publish do
   require_relative 'lib/subprocess'
   sh 'gem', 'build', 'subprocess.gemspec'
-  ENV['GEM_HOST_API_KEY'] = Subprocess.check_output(['fetch-password', '--quiet', '--raw', 'bindings/rubygems-api-key'])
   gem_file = "subprocess-#{Subprocess::VERSION}.gem"
-  sh 'gem', 'push', gem_file
+  Bundler.with_unbundled_env do
+    api_key = Subprocess.check_output(['fetch-password', '--quiet', '--raw', 'bindings/rubygems-api-key']).strip
+    gem_env = ENV.to_hash.update('GEM_HOST_API_KEY' => api_key)
+    Subprocess.check_output(['gem', 'push', gem_file], env: gem_env)
+  end
   sh 'rm', '-f', gem_file
 end
