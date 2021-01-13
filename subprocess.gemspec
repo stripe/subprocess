@@ -14,7 +14,7 @@ Gem::Specification.new do |s|
   s.description = "Control and communicate with spawned processes"
   s.license     = "MIT"
 
-  s.files       = Dir.glob("{lib}/**/*") + %w(README.md)
+  s.files       = Dir.glob("{lib,rbi}/**/*") + %w(README.md)
 
   s.add_development_dependency "minitest", "~> 5.0"
   s.add_development_dependency "rake"
