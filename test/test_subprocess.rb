@@ -37,20 +37,20 @@ EOF
   describe '.popen' do
     it 'creates Process objects' do
       p = Subprocess.popen(['true'])
-      p.must_be_instance_of(Subprocess::Process)
+      assert_instance_of(Subprocess::Process, p)
       p.wait
     end
 
     it 'complains when not given an Array' do
-      lambda {
+      assert_raises(ArgumentError) {
         Subprocess.popen("not an Array")
-      }.must_raise(ArgumentError)
+      }
     end
 
     it 'complains with a helpful error when given arrays with invalid elements' do
-      exp = lambda {
+      exp = assert_raises(ArgumentError) {
         Subprocess.popen(["not", [:allowed], 5])
-      }.must_raise(ArgumentError)
+      }
       assert_equal(
         "cmd must be an Array of strings (no implicit conversion of Array into String)",
         exp.message
@@ -60,61 +60,61 @@ EOF
 
   describe '.call' do
     it 'returns a Process::Status' do
-      Subprocess.call(['true']).must_be_instance_of(Process::Status)
+      assert_instance_of(Process::Status, Subprocess.call(['true']))
     end
 
     it 'yields before and returns after the process exits' do
       start = Time.now
       sleep_time = 0.5
       Subprocess.call(['sleep', sleep_time.to_s]) do |p|
-        (Time.now - start).must_be_close_to(0.0, 0.2)
+        assert_in_delta(0.0, Time.now - start, 0.2)
       end
 
       # The point of this isn't to test /bin/sleep: we're okay with anything
       # that's much closer to sleep_time than zero.
-      (Time.now - start).must_be_close_to(sleep_time, 0.2)
+      assert_in_delta(sleep_time, Time.now - start, 0.2)
     end
 
     it 'returns a successful status when calling true' do
-      Subprocess.call(['true']).success?.must_equal(true)
+      assert(Subprocess.call(['true']).success?)
     end
 
     it 'returns a non-successful status when calling false' do
-      Subprocess.call(['false']).success?.must_equal(false)
+      refute(Subprocess.call(['false']).success?)
     end
 
     it "doesn't spawn a subshell when passed a single argument" do
       script = File.join(File.dirname(__FILE__), 'bin', 'ppid')
-      Subprocess.check_output([script]).strip.must_equal($$.to_s)
+      assert_equal($$.to_s, Subprocess.check_output([script]).strip)
     end
   end
 
   describe '.check_call' do
     it 'returns a Process::Status' do
-      Subprocess.check_call(['true']).must_be_instance_of(Process::Status)
+      assert_instance_of(Process::Status, Subprocess.check_call(['true']))
     end
 
     it 'returns a successful status when calling true' do
-      Subprocess.check_call(['true']).success?.must_equal(true)
+      assert(Subprocess.check_call(['true']).success?)
     end
 
     it 'raises a NonZeroExit when calling false' do
-      lambda {
+      assert_raises(Subprocess::NonZeroExit) {
         Subprocess.check_call(['false'])
-      }.must_raise(Subprocess::NonZeroExit)
+      }
     end
   end
 
   describe '.check_output' do
     it 'returns the stdout of the command' do
       string = 'hello world'
-      Subprocess.check_output(['echo', '-n', string]).must_equal(string)
+      assert_equal(string, Subprocess.check_output(['echo', '-n', string]))
     end
 
     it 'raises a NonZeroExit when calling false' do
-      lambda {
+      assert_raises(Subprocess::NonZeroExit) {
         Subprocess.check_output(['false'])
-      }.must_raise(Subprocess::NonZeroExit)
+      }
     end
   end
 
@@ -122,13 +122,13 @@ EOF
     it 'sets command' do
       command = ['echo', 'all', 'your', 'llamas', 'are', 'belong', 'to', 'us']
       p = Subprocess::Process.new(command, :stdout => '/dev/null')
-      p.command.must_equal(command)
+      assert_equal(command, p.command)
       p.wait
     end
 
     it 'has a pid after it has been called' do
       p = Subprocess::Process.new(['true'])
-      p.pid.must_be(:>, 1)
+      _(p.pid).must_be(:>, 1)
       p.wait
     end
 
@@ -136,10 +136,10 @@ EOF
       fd = File.open("/dev/null")
       # cat returns an error when the file doesn't exist. We use /dev/fd/ to
       # determine if the file is still opened in the child
-      lambda {
+      assert_raises(Subprocess::NonZeroExit) {
         Subprocess.check_call(['cat', '/dev/fd/' + fd.fileno.to_s],
                               :stderr => '/dev/null')
-      }.must_raise(Subprocess::NonZeroExit)
+      }
       fd.close
     end
 
@@ -149,7 +149,7 @@ EOF
     it 'allows specifying files by name' do
       tmp = Tempfile.new('test')
       Subprocess.check_call(['cat'], :stdin => __FILE__, :stdout => tmp.path)
-      File.read(__FILE__).must_equal(File.read(tmp.path))
+      assert_equal(File.read(tmp.path), File.read(__FILE__))
       tmp.delete
     end
 
@@ -157,7 +157,7 @@ EOF
       f = File.open(__FILE__)
       tmp = Tempfile.new('test')
       Subprocess.check_call(['cat'], :stdin => f, :stdout => tmp.open)
-      File.read(__FILE__).must_equal(File.read(tmp.path))
+      assert_equal(File.read(__FILE__), File.read(tmp.path))
       tmp.delete
     end
 
@@ -165,20 +165,20 @@ EOF
       f = File.open(__FILE__)
       tmp = Tempfile.new('test')
       Subprocess.check_call(['cat'], :stdin => f.fileno, :stdout => tmp.fileno)
-      File.read(__FILE__).must_equal(File.read(tmp.path))
+      assert_equal(File.read(tmp.path), File.read(__FILE__))
       tmp.delete
     end
 
     it 'opens pipes for communication' do
       Subprocess.check_call(['cat'], :stdin => Subprocess::PIPE,
                             :stdout => Subprocess::PIPE) do |p|
-        p.stdin.must_be_instance_of(IO)
-        p.stdout.must_be_instance_of(IO)
+        assert_instance_of(IO, p.stdin)
+        assert_instance_of(IO, p.stdout)
 
         string = "Hello world"
         p.stdin.write(string)
         p.stdin.close
-        p.stdout.read.must_equal(string)
+        assert_equal(string, p.stdout.read)
       end
     end
 
@@ -190,10 +190,10 @@ EOF
       Subprocess.check_call(['sh', '-c', cmd], :stdout => Subprocess::PIPE,
                             :stderr => Subprocess::PIPE) do |p|
 
-        p.stdout.must_be_instance_of(IO)
-        p.stderr.must_be_instance_of(IO)
-        p.stdout.read.must_equal(stdout_text)
-        p.stderr.read.must_equal(stderr_text)
+        assert_instance_of(IO, p.stdout)
+        assert_instance_of(IO, p.stderr)
+        assert_equal(stdout_text, p.stdout.read)
+        assert_equal(stderr_text, p.stderr.read)
       end
     end
 
@@ -205,29 +205,29 @@ EOF
       Subprocess.check_call(['sh', '-c', cmd], :stdout => Subprocess::PIPE,
                             :stderr => Subprocess::STDOUT) do |p|
 
-        p.stdout.must_be_instance_of(IO)
-        p.stdout.read.must_equal(stdout_text + stderr_text)
+        assert_instance_of(IO, p.stdout)
+        assert_equal(stdout_text + stderr_text, p.stdout.read)
       end
     end
 
     it 'changes the working directory' do
       Dir.mktmpdir do |dir|
         real = Pathname.new(dir).realpath.to_s
-        Subprocess.check_output(['pwd'], :cwd => dir).chomp.must_equal(real)
+        assert_equal(real, Subprocess.check_output(['pwd'], :cwd => dir).chomp)
       end
     end
 
     it 'changes the environment' do
       env = {"weather" => "warm and sunny"}
       out = Subprocess.check_output(['sh', '-c', 'echo $weather'], :env => env)
-      out.chomp.must_equal(env['weather'])
+      assert_equal(env['weather'], out.chomp)
     end
 
     it 'provides helpful error messages with invalid environment arguments' do
       env = {symbol_key: "value"}
-      exp = lambda {
+      exp = assert_raises(ArgumentError) {
         Subprocess.call(['false'], :env => env)
-      }.must_raise(ArgumentError)
+      }
       assert_equal(
         "`env` option must be a hash where all keys and values are strings (no implicit conversion of Symbol into String)",
         exp.message
@@ -246,7 +246,7 @@ EOF
       fn = Proc.new { w.write($$) }
       Subprocess.check_call(['true'], :preexec_fn => fn) do |p|
         w.close
-        r.read.must_equal(p.pid.to_s)
+        assert_equal(p.pid.to_s, r.read)
         r.close
       end
     end
@@ -259,7 +259,7 @@ EOF
         real = Pathname.new(dir).realpath.to_s
         Subprocess.check_call(['true'], :preexec_fn => fn, :cwd => real) do |p|
           w.close
-          r.read.must_equal(real)
+          assert_equal(real, r.read)
           r.close
         end
       end
@@ -269,7 +269,7 @@ EOF
       start = Time.now
       p = Subprocess::Process.new(['sleep', '1'])
       p.poll
-      (Time.now - start).must_be_close_to(0.0, 0.2)
+      assert_in_delta(0.0, Time.now - start, 0.2)
       p.terminate
       p.wait
     end
@@ -283,13 +283,13 @@ EOF
         rescue IO::WaitWritable, Errno::EINTR
           retry
         end
-        written.must_be :<, MULTI_WRITE_STRING.length
+        _(written).must_be :<, MULTI_WRITE_STRING.length
       end
 
       Subprocess.check_call(['cat'], :stdin => Subprocess::PIPE,
                             :stdout => Subprocess::PIPE) do |p|
         stdout, _stderr = p.communicate(MULTI_WRITE_STRING)
-        stdout.must_equal(MULTI_WRITE_STRING)
+        assert_equal(MULTI_WRITE_STRING, stdout)
       end
     end
 
@@ -297,7 +297,7 @@ EOF
       Timeout.timeout(5) do
         p = Subprocess.popen(['true'])
         p.wait
-        out, err = p.communicate
+        _out, _err = p.communicate
       end
     end
 
@@ -308,7 +308,7 @@ EOF
 EOF
       p = Subprocess::Process.new(['bash', '-c', script], stdout: Subprocess::PIPE)
       stdout, _stderr = p.communicate(nil, 5)
-      stdout.must_include("fork\n")
+      assert_includes(stdout, "fork\n")
     end
 
     it 'should not raise an error when the process closes stdin before we finish writing' do
@@ -327,9 +327,9 @@ EOF
         yielded = false
         p.communicate(MULTI_WRITE_STRING) do |stdout, _stderr|
           if yielded
-            stdout.must_equal("")
+            assert_equal("", stdout)
           else
-            stdout.must_equal("foo")
+            assert_equal("foo", stdout)
             p.send_signal("HUP")
             yielded = true
           end
@@ -340,24 +340,24 @@ EOF
     it 'should not timeout in communicate if the command completes in time' do
       Subprocess.check_call(['echo', 'foo'], stdout: Subprocess::PIPE) do |p|
         stdout, _, = p.communicate(nil, 1)
-        stdout.must_equal("foo\n")
+        assert_equal("foo\n", stdout)
       end
     end
 
     it 'should timeout in communicate without losing data' do
       call_multiwrite_script do |p|
         # Read the first echo and timeout
-        e = lambda {
+        e = assert_raises(Subprocess::CommunicateTimeout) {
           p.communicate(nil, 0.2)
-        }.must_raise(Subprocess::CommunicateTimeout)
-        e.stderr.must_equal("foo\n")
-        e.stdout.must_equal("")
+        }
+        assert_equal("foo\n", e.stderr)
+        assert_equal("", e.stdout)
 
         # Send a signal and read the next echo
         p.send_signal('HUP')
         stdout, stderr = p.communicate
-        stdout.must_equal("bar\n")
-        stderr.must_equal("")
+        assert_equal("bar\n", stdout)
+        assert_equal("", stderr)
       end
     end
 
@@ -368,12 +368,12 @@ EOF
         res = p.communicate(nil, 5) do |stdout, stderr|
           case called
           when 0
-            stderr.must_equal("foo\n")
-            stdout.must_equal("")
+            assert_equal("foo\n", stderr)
+            assert_equal("", stdout)
             p.send_signal("HUP")
           when 1
-            stderr.must_equal("")
-            stdout.must_equal("bar\n")
+            assert_equal("", stderr)
+            assert_equal("bar\n", stdout)
           else
             raise "Unexpected #{called+1}th call to `communicate` with `#{stdout}` and `#{stderr}`"
           end
@@ -381,25 +381,25 @@ EOF
           called += 1
         end
 
-        res.must_be_nil
+        assert_nil(res)
       end
     end
 
     it 'has a license to kill' do
       start = Time.now
-      lambda {
+      assert_raises(Subprocess::NonZeroExit) {
         Subprocess.check_call(['sleep', '9001']) do |p|
           p.terminate
         end
-      }.must_raise(Subprocess::NonZeroExit)
-      (Time.now - start).must_be_close_to(0.0, 0.2)
+      }
+      assert_in_delta(0.0, Time.now - start, 0.2)
     end
 
     it 'sends other signals too' do
       Subprocess.check_call(['bash', '-c', 'read var'],
                             stdin: Subprocess::PIPE) do |p|
         p.send_signal("STOP")
-        Process.waitpid(p.pid, Process::WUNTRACED).must_equal(p.pid)
+        assert_equal(p.pid, Process.waitpid(p.pid, Process::WUNTRACED))
         p.send_signal("CONT")
         p.stdin.write("foo\n")
       end
@@ -408,9 +408,9 @@ EOF
     it "doesn't leak children when throwing errors" do
       # For some reason GitHub Actions CI fails this test.
       skip if RUBY_PLATFORM.include?('darwin')
-      lambda {
+      assert_raises(Errno::ENOENT) {
         Subprocess.call(['/not/a/file', ':('])
-      }.must_raise(Errno::ENOENT)
+      }
 
       ps_pid = 0
       procs = Subprocess.check_output(['ps', '-o', 'pid ppid']) do |p|
@@ -420,7 +420,7 @@ EOF
       pid_table = procs.split("\n")[1..-1].map{ |l| l.split(' ').map(&:to_i) }
       children = pid_table.find_all{ |pid, ppid| ppid == $$ && pid != ps_pid }
 
-      children.must_equal([])
+      assert_equal([], children)
     end
 
     describe '#communicate' do
@@ -431,7 +431,7 @@ EOF
 
         stdout, _stderr =  process.communicate
 
-        stdout.must_equal("你好世界")
+        assert_equal("你好世界", stdout)
       end
 
       it 'preserves encoding  across IO selection cycles with a block given' do
@@ -442,7 +442,7 @@ EOF
           stdout << out
         end
 
-        stdout.must_equal("你好世界")
+        assert_equal("你好世界", stdout)
       end
     end
   end
