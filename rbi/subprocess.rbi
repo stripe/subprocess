@@ -304,9 +304,9 @@ module ::Subprocess
     sig { returns(Integer) }
     attr_reader :pid
 
-    # _@return_ — The exit status code of the process. Only
-    # set after the process has exited.
-    sig { returns(::Process::Status) }
+    # _@return_ — The exit status code of the process.
+    # Only set after the process has exited.
+    sig { returns(T.nilable(::Process::Status)) }
     attr_reader :status
   end
 end

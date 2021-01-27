@@ -221,8 +221,8 @@ module Subprocess
     # @return [Integer] The process ID of the spawned process.
     attr_reader :pid
 
-    # @return [::Process::Status] The exit status code of the process. Only
-    #   set after the process has exited.
+    # @return [::Process::Status, nil] The exit status code of the process.
+    #   Only set after the process has exited.
     attr_reader :status
 
     # Create a new process.
