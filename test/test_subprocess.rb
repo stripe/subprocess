@@ -444,6 +444,19 @@ EOF
 
         assert_equal("你好世界", stdout)
       end
+
+      it 'handles binary data as stdin' do
+        message = 'ḧëḷḷöẅöṛḷḋ' * 64 * 1024
+        assert_equal(Encoding::UTF_8, message.encoding)
+
+        process = Subprocess::Process.new(['cat'], :stdin => Subprocess::PIPE, :stdout => Subprocess::PIPE)
+        stdout = ""
+        process.communicate(message) do |out, _err|
+          stdout << out
+        end
+        assert_equal(message.size, stdout.size)
+        assert_equal(message, stdout)
+      end
     end
   end
 end
