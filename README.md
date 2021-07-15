@@ -80,7 +80,7 @@ git checkout master
 bundle exec rake sord
 
 # Subsequent commands reference the version
-VERSION=1.5.4
+VERSION=1.5.5
 git commit -am "Bump version to $VERSION"
 git tag "v$VERSION"
 git push origin master --tags
