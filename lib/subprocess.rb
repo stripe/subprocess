@@ -430,7 +430,10 @@ module Subprocess
 
       stdout, stderr = "", ""
 
-      input = input.dup unless input.nil?
+      # NB: Always force encoding to binary so we handle unicode or binary input
+      # correctly across multiple write_nonblock calls, since we manually slice
+      # the input depending on how many bytes were written
+      input = input.dup.force_encoding('BINARY') unless input.nil?
 
       @stdin.close if (input.nil? || input.empty?) && !@stdin.nil?
 
