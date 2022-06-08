@@ -499,7 +499,7 @@ module Subprocess
               @stdin.close
               wait_w.delete(@stdin)
             end
-            input[0...written] = ''
+            input = input[written..input.length]
             if input.empty?
               @stdin.close
               wait_w.delete(@stdin)
