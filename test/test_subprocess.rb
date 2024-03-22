@@ -1,4 +1,5 @@
 # coding: utf-8
+# frozen_string_literal: true
 require 'rubygems'
 gem 'minitest'
 require 'minitest/autorun'
@@ -436,7 +437,7 @@ EOF
 
       it 'preserves encoding  across IO selection cycles with a block given' do
         process = Subprocess::Process.new(['bash', '-c', script], :stdout => Subprocess::PIPE)
-        stdout = ""
+        stdout = +""
 
         process.communicate do |out, _err|
           stdout << out
@@ -450,7 +451,7 @@ EOF
         assert_equal(Encoding::UTF_8, message.encoding)
 
         process = Subprocess::Process.new(['cat'], :stdin => Subprocess::PIPE, :stdout => Subprocess::PIPE)
-        stdout = ""
+        stdout = +""
         process.communicate(message) do |out, _err|
           stdout << out
         end
