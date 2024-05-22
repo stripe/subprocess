@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'thread'
 require 'set'
 
@@ -169,7 +170,7 @@ module Subprocess
     # @param [::Process::Status] status The status returned by `waitpid`.
     def initialize(cmd, status)
       @command, @status = cmd.join(' '), status
-      message = "Command #{command} "
+      message = +"Command #{command} "
       if status.exited?
         message << "returned non-zero exit status #{status.exitstatus}"
       elsif status.signaled?
@@ -428,7 +429,7 @@ module Subprocess
     def communicate(input=nil, timeout_s=nil)
       raise ArgumentError if !input.nil? && @stdin.nil?
 
-      stdout, stderr = "", ""
+      stdout, stderr = +"", +""
 
       # NB: Always force encoding to binary so we handle unicode or binary input
       # correctly across multiple write_nonblock calls, since we manually slice
@@ -508,7 +509,7 @@ module Subprocess
 
           if block_given? && !(stderr.empty? && stdout.empty?)
             yield stdout, stderr
-            stdout, stderr = "", ""
+            stdout, stderr = +"", +""
           end
         end
       end
