@@ -437,20 +437,24 @@ module Subprocess
       input = input.dup.force_encoding('BINARY') unless input.nil?
 
       # Close stdin immediately only if input is nil
-      # For empty strings, we'll close it after adding it to wait_w
-      @stdin.close if input.nil? && !@stdin.nil?
+      # For empty strings, we'll close it in the wait_w setup
+      @stdin.close if input.nil? && !@stdin.nil? && !@stdin.closed?
 
       timeout_at = Time.now + timeout_s if timeout_s
 
       self.class.catching_sigchld(pid) do |global_read, self_read|
         wait_r = [@stdout, @stderr, self_read, global_read].compact
-        wait_w = [input && @stdin].compact
         
-        # For empty string input, close stdin immediately after determining wait_w
-        # This ensures stdin is properly closed but won't be used in IO.select
-        if !input.nil? && input.empty? && !@stdin.nil?
-          @stdin.close
-          wait_w = []
+        # Set up write file descriptors for IO.select
+        wait_w = []
+        if !input.nil? && !@stdin.nil? && !@stdin.closed?
+          if input.empty?
+            # For empty input, close stdin immediately and don't add to wait_w
+            @stdin.close
+          else
+            # For non-empty input, add stdin to wait_w for writing
+            wait_w = [@stdin]
+          end
         end
         
         done = false
