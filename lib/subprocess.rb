@@ -437,8 +437,11 @@ module Subprocess
       input = input.dup.force_encoding('BINARY') unless input.nil?
 
       # Close stdin immediately only if input is nil
-      # For empty strings, we'll close it in the wait_w setup
-      @stdin.close if input.nil? && !@stdin.nil? && !@stdin.closed?
+      stdin_closed = false
+      if input.nil? && !@stdin.nil? && !@stdin.closed?
+        @stdin.close
+        stdin_closed = true
+      end
 
       timeout_at = Time.now + timeout_s if timeout_s
 
@@ -447,7 +450,7 @@ module Subprocess
         
         # Set up write file descriptors for IO.select
         wait_w = []
-        if !input.nil? && !@stdin.nil? && !@stdin.closed?
+        if !input.nil? && !@stdin.nil? && !stdin_closed
           if input.empty?
             # For empty input, close stdin immediately and don't add to wait_w
             @stdin.close
