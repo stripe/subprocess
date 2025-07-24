@@ -443,7 +443,7 @@ module Subprocess
 
       self.class.catching_sigchld(pid) do |global_read, self_read|
         wait_r = [@stdout, @stderr, self_read, global_read].compact
-        wait_w = @stdin&.closed? ? [] : [input && @stdin]
+        wait_w = @stdin&.closed? ? [] : [input && @stdin].compact
 
         done = false
         while !done
