@@ -6,11 +6,11 @@ require 'subprocess'
 
 describe Subprocess do
   describe "communicate with empty string input" do
-    # Bug report: subprocess.communicate("") doesn't properly
-    # close stdin, causing you to end up a broken pipe.
+    # Bug report: subprocess.communicate("") doesn't properly handle stdin,
+    # causing it to close incorrectly and result in a broken pipe.
     it "should not raise IOError when passing empty string" do
       # Before the fix, this would raise: IOError: closed stream
-      Subprocess.check_call(['cat'], 
+      Subprocess.check_call(['cat'],
                            stdin: Subprocess::PIPE,
                            stdout: Subprocess::PIPE) do |p|
         stdout, stderr = p.communicate("")
@@ -21,7 +21,7 @@ describe Subprocess do
 
     it "should work correctly with non-empty string input" do
       test_input = "hello world"
-      Subprocess.check_call(['cat'], 
+      Subprocess.check_call(['cat'],
                            stdin: Subprocess::PIPE,
                            stdout: Subprocess::PIPE) do |p|
         stdout, stderr = p.communicate(test_input)
@@ -31,7 +31,7 @@ describe Subprocess do
     end
 
     it "should work correctly with nil input" do
-      Subprocess.check_call(['cat'], 
+      Subprocess.check_call(['cat'],
                            stdin: Subprocess::PIPE,
                            stdout: Subprocess::PIPE) do |p|
         stdout, stderr = p.communicate(nil)
