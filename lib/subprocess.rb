@@ -437,28 +437,14 @@ module Subprocess
       input = input.dup.force_encoding('BINARY') unless input.nil?
 
       # Close stdin immediately if input is nil or empty
-      stdin_closed = false
-      if !@stdin.nil?
-        if @stdin.closed?
-          stdin_closed = true
-        elsif input.nil? || input.empty?
-          @stdin.close
-          stdin_closed = true
-        end
-      end
+      @stdin.close if @stdin && (input.nil? || input.empty?)
 
       timeout_at = Time.now + timeout_s if timeout_s
 
       self.class.catching_sigchld(pid) do |global_read, self_read|
         wait_r = [@stdout, @stderr, self_read, global_read].compact
-        
-        # Set up write file descriptors for IO.select
-        wait_w = []
-        if !stdin_closed && !@stdin.nil?
-          # Add stdin to wait_w for writing
-          wait_w = [@stdin]
-        end
-        
+        wait_w = @stdin&.closed? ? [] : [input && @stdin]
+
         done = false
         while !done
           # If the process has exited, we want to drain any remaining output before returning
