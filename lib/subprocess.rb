@@ -436,11 +436,15 @@ module Subprocess
       # the input depending on how many bytes were written
       input = input.dup.force_encoding('BINARY') unless input.nil?
 
-      # Close stdin immediately only if input is nil
+      # Close stdin immediately if input is nil or empty
       stdin_closed = false
-      if input.nil? && !@stdin.nil? && !@stdin.closed?
-        @stdin.close
-        stdin_closed = true
+      if !@stdin.nil?
+        if @stdin.closed?
+          stdin_closed = true
+        elsif input.nil? || input.empty?
+          @stdin.close
+          stdin_closed = true
+        end
       end
 
       timeout_at = Time.now + timeout_s if timeout_s
@@ -450,14 +454,9 @@ module Subprocess
         
         # Set up write file descriptors for IO.select
         wait_w = []
-        if !input.nil? && !@stdin.nil? && !stdin_closed
-          if input.empty?
-            # For empty input, close stdin immediately and don't add to wait_w
-            @stdin.close
-          else
-            # For non-empty input, add stdin to wait_w for writing
-            wait_w = [@stdin]
-          end
+        if !stdin_closed && !@stdin.nil?
+          # Add stdin to wait_w for writing
+          wait_w = [@stdin]
         end
         
         done = false
