@@ -1,4 +1,4 @@
-# subprocess ![Ruby](https://github.com/stripe/subprocess/workflows/Ruby/badge.svg) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess/subprocess)
+# Subprocess ![Ruby](https://github.com/stripe/subprocess/workflows/Ruby/badge.svg) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess/subprocess)
 
 ![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
 
@@ -28,8 +28,8 @@ Check user's animal allegiances:
 
 ```ruby
 begin
-  subprocess.check_call(['grep', '-q', 'llamas', '~/favorite_animals'])
-rescue subprocess::NonZeroExit => e
+  Subprocess.check_call(['grep', '-q', 'llamas', '~/favorite_animals'])
+rescue Subprocess::NonZeroExit => e
   puts e.message
   puts "Why aren't llamas one of your favorite animals?"
 end
@@ -38,13 +38,13 @@ end
 Parse the output of `uptime(1)` to find the system's load:
 
 ```ruby
-system_load = subprocess.check_output(['uptime']).split(' ').last(3)
+system_load = Subprocess.check_output(['uptime']).split(' ').last(3)
 ```
 
 Send mail to your friends with `sendmail(1)`:
 
 ```ruby
-subprocess.check_call(%W{sendmail -t}, :stdin => subprocess::PIPE) do |p|
+Subprocess.check_call(%W{sendmail -t}, :stdin => Subprocess::PIPE) do |p|
   p.communicate <<-EMAIL
 From: alpaca@example.com
 To: llama@example.com
