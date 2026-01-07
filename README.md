@@ -1,4 +1,4 @@
-# Subprocess ![Ruby](https://github.com/stripe/subprocess/workflows/Ruby/badge.svg) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess/Subprocess)
+# Subprocess ![Ruby](https://github.com/stripe/subprocess/workflows/Ruby/badge.svg) [![Yard Docs](http://img.shields.io/badge/yard-docs-blue.svg)](http://rubydoc.info/github/stripe/subprocess)
 
 ![Jacques Cousteau Submarine](http://i.imgur.com/lmej24F.jpg)
 
@@ -63,7 +63,7 @@ at home using `subprocess`. We have attempted to [document][rubydoc] all of the
 differences, but if we have missed something, please file an issue.
 
 [python]: http://docs.python.org/library/subprocess.html
-[rubydoc]: http://rubydoc.info/github/stripe/subprocess/Subprocess
+[rubydoc]: http://rubydoc.info/github/stripe/subprocess
 
 Maintenance
 -----------
